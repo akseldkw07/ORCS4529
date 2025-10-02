@@ -33,13 +33,13 @@ and the currently observed digit $d$. The round number $t$ is implicit in the st
 Note that I have \tbf{not} included the partially filled number in the state. It's easier to bake this
 into the reward structure instead of carrying it around in the state.
 
+\tbf{Indexing convention:} I will index the positions of the five-digit number from left to right, starting
+at $1$ (ie the most significant digit is position $1$, and the least significant digit is position $5$).
+
 On that note, I'll define the reward structure, and some of my reasons for the setup. The reward
-function is simply the immediate value of placing digit $d$ in position $p$, which is $d\cdot 10^p$. This
+function is simply the immediate value of placing digit $d$ in position $p$, which is $d\cdot 10^{r-p}$. This
 feels natural, intuitive, and doesn't require additional bookkeeping nor recalculation at the completion
 of the game.
-
-Alternatively, to maintain the order of the vector with the lexicographic and familiar ordering, I could define
-the reward as $d\cdot 10^{r-1-p}$
 
 \medskip
 \noindent\tbf{States.} At the point of each decision in round $t \in [r]$, the state is
@@ -50,13 +50,13 @@ Like I touched upon in the intro, the state consists of a mask $\bm \in \{0,1\}^
 \medskip
 \noindent\tbf{Actions.} From state $(\bm,d)$, choose any empty position:
 \[
-		\cA(\bm)=\{\,p\in\{0,\ldots,r-1\}:\ m_p=0\,\}.
+		\cA(\bm)=\{\,p\in\{1,\ldots,r\}:\ m_p=0\,\}.
 \]
 
 \medskip
 \noindent\tbf{Transition model.} Let's define the helper function $\mathrm{fill}(\bm,p)$ that returns the mask with position $p$ set to $1$:
 \[
-		\mathrm{fill}(\bm,p) = (m_0,\ldots,m_{p-1},1,m_{p+1},\ldots,m_{r-1}).
+		\mathrm{fill}(\bm,p) = (m_1,\ldots,m_{p-1},1,m_{p+1},\ldots,m_{r}).
 \]
 After taking action $a=p$ (placing digit $d$ at position $p$), the next state is
 \[
@@ -72,11 +72,11 @@ In plain English, the next state is the same as the current state except that po
 and the next digit is drawn uniformly from $\{0,\ldots,9\}$.
 
 \medskip
-\noindent\tbf{Rewards.} Pay the immediate decimal contribution when a digit is placed:
+\noindent\tbf{Rewards.} Receive the value of placing digit $d$ in position $p$:
 \[
-		r\big((\bm,d),a=p\big)= d\,10^{p}.
+		r\big((\bm,d),a=p\big)= d\,10^{r-p}.
 \]
-The nice thing about this rewards strcture is that there's no need for additional calculation at
+The nice thing about this reward structure is that there's no need for additional calculation at
 the end of the game.
 
 \medskip
@@ -84,6 +84,12 @@ the end of the game.
 \[
 		\max_{\pi}\ \mathbb{E}_{\pi}\Big[\sum_{t=0}^{4} r(s_t,a_t)\Big].
 \]
+
+At first, it might seem weird that we're not carrying the current digit vector in the state. Like, shouldn't you care
+about the current state of the digits vector? In truth it's easier to just view this problem as a sequence of rewards
+multiplied by the digit's positional value. The only real state information we need to carry from round to round is
+the mask of filled positions and the current digit. This also drastically reduces the size of the state space, and allows
+our agent to converge on the optimal policy exponentially faster (especially as the number of rounds increases).
 
 \newpage
 \section*{Problem 2}
@@ -123,7 +129,7 @@ Let $V_k(s)$ be the optimal expected revenue with $k$ rounds remaining (so $V_0\
 \]
 
 \noindent\tit{Intuition / Strategy} Product \#2 offers a higher reward per purchase and over the long run,
-it will be available with the same frequency as product \#1 (both products have symmetric flip probabilities).
+it will be available at the same frequency as product \#1 (both products have symmetric flip probabilities).
 In an infinite horizon setting, the optimal policy is to always recommend product \#2.
 However, in a finite horizon setting, it can be higher EV to recommend product \#1 when product \#2 is
 unavailable (state $EU$), and there are few turns left.
