@@ -1,0 +1,79 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.2in]{geometry}
+% NOTE: Defining collaborators is optional; to not list collaborators, comment out the
+% line below. Maximum of two collaborators per problem set.
+%\newcommand{\collaborators}{Vig Vigerton (\texttt{UNI}), Alice Bob (\texttt{UNI})}
+% No collaborators on PS 0
+
+\makeatletter
+\def\input@path{{../}{../../}} % add as many parents as you need
+\makeatother
+\input{../pset_template.tex}
+
+\begin{document}
+
+\section*{Problem 5: Linear Program Duality}
+
+Lets first group constants and variables
+\begin{align*}
+		v + 0.5x_1 - 0.2x_2 - 0.3x_3 \ge 2 \\
+		v - 0.1x_1 + 0.1x_2 \ge 3 \\
+		v - 0.2x_1 - 0.95x_2 + 0.95x_3 \ge 5
+\end{align*}
+
+Written in standard form, the coefficient vector $c$, coefficient matrix $A$, and constant vector $b$ are:
+$$
+c =
+\begin{pmatrix} 1 \\ 0 \\ 0 \\ 0
+\end{pmatrix}, \quad
+A =
+\begin{pmatrix}
+		1 & 0.5 & -0.2 & -0.3 \\
+		1 & -0.1 & 0.1 & 0 \\
+		1 & -0.2 & -0.95 & 0.95
+\end{pmatrix}, \quad
+b =
+\begin{pmatrix} 2 \\ 3 \\ 5
+\end{pmatrix}
+$$
+
+\subsection*{Dual LP Formulation}
+Here, the dual variable vector is $y =
+\begin{pmatrix} y_1 \\ y_2 \\ y_3
+\end{pmatrix}$.
+
+Our goal is to maximize $b^T y = 2y_1 + 3y_2 + 5y_3$.
+
+The constraints are found by transposing $A$ and multiplying by $y$, then setting it equal to $c$:
+$$
+A^T =
+\begin{pmatrix}
+		1 & 1 & 1 \\
+		0.5 & -0.1 & -0.2 \\
+		-0.2 & 0.1 & -0.95 \\
+		-0.3 & 0 & 0.95
+\end{pmatrix}
+$$
+The constraints are:
+\begin{align*}
+		y_1 + y_2 + y_3 &= 1 \\
+		0.5y_1 - 0.1y_2 - 0.2y_3 &= 0 \\
+		-0.2y_1 + 0.1y_2 - 0.95y_3 &= 0 \\
+		-0.3y_1 + 0.95y_3 &= 0
+\end{align*}
+
+\textbf{Sign Constraints:}
+Since the primal constraints are of the "$\ge$" type, the dual variables must be non-negative: $y_1, y_2, y_3 \ge 0$.
+
+\textbf{Final Dual Formulation:}
+The complete dual LP is:
+\begin{align*}
+		\text{Maximize} \quad & 2y_1 + 3y_2 + 5y_3 \\
+		\text{s.t.} \quad & y_1 + y_2 + y_3 = 1 \\
+		& 0.5y_1 - 0.1y_2 - 0.2y_3 = 0 \\
+		& -0.2y_1 + 0.1y_2 - 0.95y_3 = 0 \\
+		& -0.3y_1 + 0.95y_3 = 0 \\
+		& y_1, y_2, y_3 \ge 0
+\end{align*}
+
+\end{document}

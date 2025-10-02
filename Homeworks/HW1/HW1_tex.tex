@@ -1,0 +1,276 @@
+\documentclass[12pt]{article}
+
+\newcommand{\duedate}{10/02/2025}
+\newcommand{\assignment}{Problem Set 1} % Change to "Problem Set X"
+
+% Change the following to your name and UNI.
+\newcommand{\name}{Aksel Kretsinger-Walters, adk2164}
+\newcommand{\email}{adk2164@columbia.edu}
+
+% NOTE: Defining collaborators is optional; to not list collaborators, comment out the
+% line below. Maximum of two collaborators per problem set.
+%\newcommand{\collaborators}{Vig Vigerton (\texttt{UNI}), Alice Bob (\texttt{UNI})}
+% No collaborators on PS 0
+
+\makeatletter
+\def\input@path{{../}{../../}} % add as many parents as you need
+\makeatother
+\input{../pset_template.tex}
+
+\begin{document}
+\psetheader %% DO NOT CHANGE THIS LINE
+
+\section*{Problem 1}
+
+\tbf{MDP Formulation}
+
+I've decided to formulate the problem as a finite horizon undiscounted MDP problem. There
+are 5 rounds, and 4 decisions to be made (the last digit is forced). The state consists of a mask
+(ie boolean vector) indicating which positions are still available (we will define
+$r$ to be the number of rounds of the game, and denote this mask as $\bm \in \RR^{r \times 1}$)
+and the currently observed digit $d$. The round number $t$ is implicit in the state as $t=\sum_p m_p$.
+
+Note that I have \tbf{not} included the partially filled number in the state. It's easier to bake this
+into the reward structure instead of carrying it around in the state.
+
+On that note, I'll define the reward structure, and some of my reasons for the setup. The reward
+function is simply the immediate value of placing digit $d$ in position $p$, which is $d\cdot 10^p$. This
+feels natural, intuitive, and doesn't require additional bookkeeping nor recalculation at the completion
+of the game.
+
+Alternatively, to maintain the order of the vector with the lexicographic and familiar ordering, I could define
+the reward as $d\cdot 10^{r-1-p}$
+
+\medskip
+\noindent\tbf{States.} At the point of each decision in round $t \in [r]$, the state is
+$$s_t = (\bm,d)$$
+Like I touched upon in the intro, the state consists of a mask $\bm \in \{0,1\}^{r \times 1}$ indicating which positions are filled
+($m_p=1$ if position $p$ is filled, else $0$), and the currently observed digit $d \in \{0,\ldots,9\}$.
+
+\medskip
+\noindent\tbf{Actions.} From state $(\bm,d)$, choose any empty position:
+\[
+		\cA(\bm)=\{\,p\in\{0,\ldots,r-1\}:\ m_p=0\,\}.
+\]
+
+\medskip
+\noindent\tbf{Transition model.} Let's define the helper function $\mathrm{fill}(\bm,p)$ that returns the mask with position $p$ set to $1$:
+\[
+		\mathrm{fill}(\bm,p) = (m_0,\ldots,m_{p-1},1,m_{p+1},\ldots,m_{r-1}).
+\]
+After taking action $a=p$ (placing digit $d$ at position $p$), the next state is
+\[
+		\bm'=\mathrm{fill}(\bm,p), \qquad d' \sim \mathrm{Unif}\{0,\ldots,9\}
+\]
+For each $d'\in\{0,\ldots,9\}$,
+\[
+		\Pr\!\left(\big(\mathrm{fill}(\bm,p),d'\big)\,\middle|\,(\bm,d),a=p\right)=\tfrac{1}{10},
+\]
+and all other next states have probability $0$.
+
+In plain English, the next state is the same as the current state except that position $p$ is now filled,
+and the next digit is drawn uniformly from $\{0,\ldots,9\}$.
+
+\medskip
+\noindent\tbf{Rewards.} Pay the immediate decimal contribution when a digit is placed:
+\[
+		r\big((\bm,d),a=p\big)= d\,10^{p}.
+\]
+The nice thing about this rewards strcture is that there's no need for additional calculation at
+the end of the game.
+
+\medskip
+\noindent\tbf{Objective.} Maximize expected total reward over the five decisions:
+\[
+		\max_{\pi}\ \mathbb{E}_{\pi}\Big[\sum_{t=0}^{4} r(s_t,a_t)\Big].
+\]
+
+\newpage
+\section*{Problem 2}
+
+\tbf{Finite-horizon DP formulation and solution}
+
+We have a finite horizon undiscounted MDP with 3 rounds. The state encodes the customer's excitement
+for the two products $s=(x_1,x_2)\in\{E,U\}^2$ at the start of each round and the action space
+$a\in\{1,2\}$ represents the seller's recommendation.
+
+One could consider adding the round number $t$ to the state, but it is not necessary since the horizon is fixed and known.
+
+\medskip
+\noindent\tbf{Reward.}
+\[
+		r(s,a)=
+		\begin{cases}
+				1, & a=1 \text{ and } x_1=E,\\
+				2, & a=2 \text{ and } x_2=E,\\
+				0, & \text{otherwise.}
+		\end{cases}
+\]
+
+\medskip
+\noindent\tbf{Transition model.}
+At the end of the round, only the recommended product’s excitement may flip:
+\[
+		\Pr(x_1'=\neg x_1\mid a=1)=0.1,\qquad \Pr(x_2'=\neg x_2\mid a=2)=0.5,
+\]
+and the other component stays unchanged.
+
+\medskip
+\noindent\tbf{Bellman Equation.}
+Let $V_k(s)$ be the optimal expected revenue with $k$ rounds remaining (so $V_0\equiv 0$). Then for $k\ge 1$,
+\[
+		V_k(s)=\max_{a\in\{1,2\}}\big[r(s,a)+\bE\big[\,V_{k-1}(s')\mid s,a\,\big]\big].
+\]
+
+\noindent\tit{Intuition / Strategy} Product \#2 offers a higher reward per purchase and over the long run,
+it will be available with the same frequency as product \#1 (both products have symmetric flip probabilities).
+In an infinite horizon setting, the optimal policy is to always recommend product \#2.
+However, in a finite horizon setting, it can be higher EV to recommend product \#1 when product \#2 is
+unavailable (state $EU$), and there are few turns left.
+
+\medskip
+\noindent\tbf{Backward induction.} The state space is $\{EE,EU,UE,UU\}$.
+Let's calculate $V_k$ and an optimal action $\pi_k^\ast(s)$.
+
+\medskip
+\noindent\underline{$k=1$ (one round left):}
+At this point, we're just trying to maximize immediate reward. So, if the second product is available,
+we recommend it. If not, recommend the first product. If neither is available, the policy is indifferent.
+\[
+		\begin{array}{c|cccc}
+				s & EE & EU & UE & UU\\\hline
+				V_1(s) & 2 & 1 & 2 & 0\\
+				\pi_1^\ast(s) & 2 & 1 & 2 & \varnothing
+		\end{array}
+\]
+
+\medskip
+\noindent\underline{$k=2$:}
+We now have to consider the final round as well. Our strategy will be similar to $k=1$, but we have a
+preference to recommend product \#2 because it has a higher reward.
+\[
+		\begin{array}{c|cccc}
+				s & EE & EU & UE & UU\\\hline
+				V_2(s) & 3.5 & 1.9 & 3.0 & 1.0\\
+				\pi_2^\ast(s) & 2 & 1 & 2 & 2
+		\end{array}
+\]
+
+\medskip
+\noindent\underline{$k=3$:}
+Our strategy is the same as $k=2$
+\[
+		\begin{array}{c|cccc}
+				s & EE & EU & UE & UU\\\hline
+				V_3(s) & 4.7 & 2.81 & 4.0 & 2.0 \\
+				\pi_3^\ast(s) & 2 & 1 & 2 & 2
+		\end{array}
+\]
+
+\medskip
+\noindent\tbf{Optimal 3 round policy.}
+From any state with $k\in\{2,3\}$ rounds left, the same mapping applies:
+\[
+		EE\to 2,\quad EU\to 1,\quad UE\to 2,\quad UU\to 2,
+\]
+with $k=1$ agreeing except that $UU$ is a tie. Starting from the given initial state $EE$ (both eager), the optimal expected total revenue is
+\[
+		W_3(EE)=\boxed{4.7}.
+\]
+\newpage
+\section*{Problem 3}
+\subsection*{Part (a)}
+Lets first restate the relationship between average reward and discounted value from our lecture slides:
+$$		\rho^\pi(s)\;=\;\lim_{\gamma\to 1}(1-\gamma)\,V^\pi_\gamma(s)$$
+
+Bias is defined as
+\[
+		h^\pi(s)\;=\;\lim_{T\to\infty}\,\bE\!\Big[\sum_{t=1}^T\big(r_t-\rho^\pi(s_t)\big)\,\Big|\,s_1=s\Big],
+\]
+and the slides show
+\[
+		h^\pi(s)-h^\pi(s')\;=\;\lim_{\gamma\to 1}\Big(V^\pi_\gamma(s)-V^\pi_\gamma(s')\Big).
+\]
+
+There are two states $s_1,s_2$; in each, two actions $a_1,a_2$ with deterministic transitions and rewards:
+\[
+		\begin{aligned}
+				&s_1\xrightarrow[a_1]{\ \$4\ }\ s_1, \qquad s_1\xrightarrow[a_2]{\ \$3\ }\ s_2,\\
+				&s_2\xrightarrow[a_1]{\ \$7\ }\ s_2, \qquad s_2\xrightarrow[a_2]{\ \$5\ }\ s_1.
+		\end{aligned}
+\]
+
+I will denote the four deterministic stationary policies by $\pi^{ij}$ where $i$ is the action
+in $s_1$ and $j$ is the action in $s_2$. So for example, $\pi^{12}$ will loop in $s_1$ and transition
+from $s_2$ to $s_1$.
+
+\medskip
+Lets start in state $s_1$ and calculate the discounted values for each policy.
+
+$V^{\pi^{11}}_\gamma(s_1) = 4 + 4\gamma + 4\gamma^2 + ... = \frac{4}{1-\gamma}$
+
+$V^{\pi^{12}}_\gamma(s_1) = 4 + 4\gamma + 4\gamma^2 + ... = \frac{4}{1-\gamma}$
+
+$V^{\pi^{21}}_\gamma(s_1) = 3 + 7\gamma + 7\gamma^2 + ... = 3+\gamma\frac{7}{1-\gamma}$
+
+$V^{\pi^{22}}_\gamma(s_1) = 3 + 5\gamma + 3\gamma^2 + 5\gamma^3 + ... = \frac{3 + 5\gamma}{1-\gamma^2}$
+
+\medskip
+Lets move to state $s_2$
+
+$V^{\pi^{11}}_\gamma(s_2) = 7 + 7\gamma + 7\gamma^2 + ... = \frac{7}{1-\gamma}$
+
+$V^{\pi^{12}}_\gamma(s_2) = 5 + 4\gamma + 4\gamma^2 + ... = 5 +\gamma\frac{ 4}{1-\gamma}$
+
+$V^{\pi^{21}}_\gamma(s_2) = 7 + 7\gamma + 7\gamma^2 + ... = \frac{7}{1-\gamma}$
+
+$V^{\pi^{22}}_\gamma(s_2) = 5 + 3\gamma + 5\gamma^2 + 3\gamma^3 + ... = \frac{5 + 3\gamma}{1-\gamma^2}$
+
+\medskip
+Moving on to average rewards, we can see that $\pi^{21}$ is the only policy that yields an average reward of 7
+in both states. $\pi^{11}$ yields 4 in $s_1$ and 7 in $s_2$. $\pi^{12}$ and $\pi^{22}$ both yield 4
+in both states.
+
+\newpage
+\subsection*{Part (b)}
+\tbf{(1) -1 discount optimal (average-reward optimal):}
+At $s_1$, the only policy that maximizes average reward is $\pi^{21}$. At $s_2$, both $\pi^{11}$ and $\pi^{21}$
+maximize average reward. However, to be optimal at both states simultaneously, we must choose $\pi^{21}$.
+So the only -1 discount optimal policy is $\pi^{21}$.
+
+\tbf{(2) 0 discount optimal (bias optimal):}
+Apologies in advance for the brevity, but we can quickly see that at $s_2$, both $\pi^{11}$ and $\pi^{21}$
+maximize the gain, regardless of discount applied. We'll conclude that $\pi^{21}$ is the optimal 0-discount policy
+for the same reason as above.
+
+\medskip
+The situation is more interesting at $s_1$. Depending on the discount factor, it might be better to
+choose $\pi^{11}$ or $\pi^{21}$. Lets setup the inequality:
+\begin{align*}
+		V^{\pi^{21}}_\gamma(s_1) - V^{\pi^{11}}_\gamma(s_1) &\geq 0\\
+		3 + \gamma\frac{7}{1-\gamma} - \frac{4}{1-\gamma} &\geq 0\\
+		\frac{3(1-\gamma) + 7\gamma - 4}{1-\gamma} &\ge 0 \\
+		3 - 3\gamma + 7\gamma - 4 &\ge 0 \\
+		4\gamma - 1 &\ge 0 \\
+		\gamma &\ge 0.25
+\end{align*}
+
+So for $\gamma \geq 0.25$, $\pi^{21}$ is optimal at $s_1$. For $\gamma < 0.25$, $\pi^{11}$ is optimal at $s_1$.
+
+\tbf{(3) 1 and $\infty$ discount optimal:}
+The same logic applies as in (2). $\pi^{21}$ is optimal at $s_2$ for all $\gamma$. At $s_1$, $\pi^{21}$ is
+optimal for $\gamma \geq 0.25$. So the only 1-discount optimal policy is $\pi^{21}$.
+
+\medskip
+\subsection*{Part (c)}
+We have shown that when $\gamma\ge 0.25$, $\pi^{21}$ is n-discount optimal for all $n\ge -1$.
+When $\gamma<0.25$, $\pi^{11}$ is optimal at $s_1$ but not at $s_2$. So, our blackwell optimal policy
+is $\pi^{21}$, and the smallest discount factor that suffices is $\gamma^\ast(s_1)=0.25$.
+\[
+		\boxed{\ \text{Blackwell optimal policy }=\ \pi^{21},\quad \gamma^\ast(s_1)=0.25,\ \gamma^\ast(s_2)=0\ }.
+\]
+
+% \newpage
+% \section*{Problem 4}
+
+\end{document}

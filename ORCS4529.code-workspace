@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../Latex-Examples"
+		},
+		{
+			"path": "../../../coding/kretsinger"
+		}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "/Users/Akseldkw/micromamba/envs/kret_312/bin/python",
+		"chatgpt.openOnStartup": false
+	}
+}
