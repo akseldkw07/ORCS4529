@@ -8,10 +8,16 @@
 		},
 		{
 			"path": "../../../coding/kretsinger"
+		},
+		{
+			"path": "../../../coding/Columbia/ORCS4529-Data"
 		}
 	],
 	"settings": {
 		"python.defaultInterpreterPath": "/Users/Akseldkw/micromamba/envs/kret_312/bin/python",
-		"chatgpt.openOnStartup": false
+		"chatgpt.openOnStartup": false,
+		"codegraphy.connectionType": "Interaction",
+		"codegraphy.nodeSize": "Lines",
+		"codegraphy.showNodeModules": false
 	}
 }
