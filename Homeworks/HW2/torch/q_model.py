@@ -3,12 +3,12 @@ import torch
 import numpy as np
 
 
-class Qfunction(object):
+class Qfunction:
     obssize: int
     actsize: int
     h1: int
     h2: int
-    model: torch.nn.Module
+    model: torch.nn.Sequential
     optimizer: torch.optim.Optimizer
 
     def __init__(self, obssize: int, actsize: int | np.signedinteger, lr: float):
@@ -51,9 +51,7 @@ class Qfunction(object):
         out.scatter_(1, y, 1.0)
         return out
 
-    def compute_Qvalues(
-        self, states: torch.Tensor, actions: torch.Tensor
-    ) -> torch.Tensor:
+    def compute_Qvalues(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
         """
         input: list of numsamples state-action pairs
         output: List of Q values for each input (s,a). The output will have size [numsamples, 1]
@@ -63,7 +61,7 @@ class Qfunction(object):
 
         states = states.float().view(-1, self.obssize)  # (N, 4)
         actions = actions.view(-1, 1).long()  # (N, 1)
-        q_all = self.model(states)  # (N, 2)
+        q_all: torch.Tensor = self.model(states)  # (N, 2)
         return q_all.gather(1, actions).squeeze(1)
 
     def compute_maxQvalues(self, states: torch.Tensor | np.ndarray) -> torch.Tensor:
@@ -75,10 +73,10 @@ class Qfunction(object):
         # if the neural takes as input a state-action pair, then the code will need to loop over all actions to compute all values
         states = torch.from_numpy(states) if isinstance(states, np.ndarray) else states
         states = states.float().view(-1, self.obssize)  # <— force (N, 4)
-        q_all = self.model(states)  # (N, actsize)
+        q_all: torch.Tensor = self.model(states)  # (N, actsize)
         return torch.max(q_all, dim=1).values
 
-    def compute_argmaxQ(self, state: np.ndarray | torch.Tensor, epsilon: float = 0):
+    def compute_argmaxQ(self, state: np.ndarray | torch.Tensor, epsilon: float | np.float32 = 0):
         """
         input:
             state: (obssize,) or (1, obssize)
