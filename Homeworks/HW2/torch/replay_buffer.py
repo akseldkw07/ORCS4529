@@ -39,22 +39,33 @@ class ReplayBuffer(deque[Transition]):
         )
 
     def sample_batch(self, batch_size: int, decay_denom: int | None = None):
+        """
+        Return a minibatch in the exact format the training loop expects:
+            states:   (N, S) float32
+            actions:  (N,)   int64
+            rewards:  (N,)   float32
+            newstates:(N, S) float32
+            dones:    (N,)   float32  (0.0 or 1.0)
+
+        NOTE: Transition is (state, action, reward, done, next_state).
+        """
         self._sample_idxs(batch_size, decay_denom)
 
-        # in ReplayBuffer.sample_batch, just before returning
-        s, a, r, s2, d = zip(*(self[i] for i in self.idxs_last))
+        # Unpack in the SAME order as Transition:
+        # (s, a, r, d, s2) — not (s, a, r, s2, d)
+        s, a, r, d, s2 = zip(*(self[i] for i in self.idxs_last))
 
-        fix = lambda x: np.asarray(x, dtype=np.float32).reshape(-1)  # force (4,)
-        states = np.stack([fix(si) for si in s])
-        newst = np.stack([fix(s2i) for s2i in s2])
+        def _vec(x: np.ndarray) -> np.ndarray:
+            # coerce each state to shape (S,) float32
+            return np.asarray(x, dtype=np.float32).reshape(-1)
 
-        return (
-            states,
-            np.asarray(a),
-            np.asarray(r, dtype=np.float32),
-            newst,
-            np.asarray(d, dtype=np.bool_),
-        )
+        states = np.stack([_vec(si) for si in s])  # (N, S)
+        newstates = np.stack([_vec(s2i) for s2i in s2])  # (N, S)
+        actions = np.asarray(a, dtype=np.int64).reshape(-1)
+        rewards = np.asarray(r, dtype=np.float32).reshape(-1)
+        dones = np.asarray(d, dtype=np.float32).reshape(-1)  # 0.0 or 1.0
+
+        return states, actions, rewards, newstates, dones
 
     def sample_batch_deprecated(self, batch_size: int, decay_denom: int | None = None):
         self._sample_idxs(batch_size, decay_denom)

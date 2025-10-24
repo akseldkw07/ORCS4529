@@ -1,11 +1,14 @@
 import numpy as np
+import wandb
 import torch
 import typing as t
 from gymnasium.wrappers.common import TimeLimit
 from gymnasium.spaces import Discrete, Box
+import tqdm
 import q_model as q_model
 from q_model import Qfunction
 from replay_buffer import ReplayBuffer
+from gymnasium.envs.classic_control.cartpole import CartPoleEnv
 
 # from .q_model import Qfunction
 # from .replay_buffer import ReplayBuffer
@@ -20,10 +23,10 @@ envname = "CartPole-v0"  # environment name
 tau = 100  # time steps for target update
 episodes = 300  # number of episodes to run
 initialsize = 500  # initial time steps before start training
-trainfreq = 20  # frequency of training steps
+trainfreq = 10  # frequency of training steps
 epsilon = 0.2  # constant for exploration
 gamma = 0.99  # discount
-
+print_debug = False  # whether to print debug info
 # initialize environment
 # env: TimeLimit = gym.make(envname)
 # env.observation_space = t.cast(Box, env.observation_space)
@@ -45,19 +48,21 @@ def run_target_update(Qprincipal: Qfunction, Qtarget: Qfunction):
 
 
 def training_loop(
-    Qprincipal: Qfunction, Qtarget: Qfunction, buffer: ReplayBuffer, env: TimeLimit
+    Qprincipal: Qfunction,
+    Qtarget: Qfunction,
+    buffer: ReplayBuffer,
+    env: CartPoleEnv,
+    rrecord: list,
+    totalstep: int,
 ):
     # main iteration
-    rrecord = []
-    totalstep = 0
-    for episode in range(episodes):
+    for episode in tqdm.tqdm(range(episodes)):
 
         obs, info = env.reset()
         done = False
         rsum = 0
 
         while not done:
-
             # greedy choice below. Use epsilon greedy for exploration
             action = Qprincipal.compute_argmaxQ(np.expand_dims(obs, 0), epsilon=epsilon)
 
@@ -84,7 +89,7 @@ def training_loop(
                 qnews = Qtarget.compute_maxQvalues(newstates).detach().view(-1)
 
                 # Bellman targets: d = r + γ * (1 - done) * max_a Q_target(s', a)
-                targets_t = rewards + gamma * (1.0 - dones) * qnews
+                targets_t = rewards + gamma * (1.0 - dones) * qnews.numpy()
 
                 # train principal net (expects NumPy or Torch? yours accepts either; let’s pass Torch)
                 loss = Qprincipal.train(states, actions, targets_t)
@@ -104,7 +109,7 @@ def training_loop(
         rrecord.append(rsum)
 
         # printing functions for debugging purposes. Feel free to add more
-        if episode % 10 == 0:
+        if print_debug and episode % 10 == 0:
             print("buffersize {}".format(len(buffer)))
             print(
                 "episode {} ave training returns {}".format(
@@ -115,6 +120,12 @@ def training_loop(
         # printing moving averages for smoothed visualization.
         fixedWindow = 100
         movingAverage = 0
-        # if len(rrecord) >= fixedWindow:
-        #     movingAverage = np.mean(rrecord[len(rrecord) - fixedWindow : len(rrecord) - 1])
-        # wandb.log({"training reward": rsum, "train reward moving average": movingAverage})
+        if len(rrecord) >= fixedWindow:
+            movingAverage = np.mean(
+                rrecord[len(rrecord) - fixedWindow : len(rrecord) - 1]
+            )
+        wandb.log(
+            {"training reward": rsum, "train reward moving average": movingAverage}
+        )
+
+    return rrecord, totalstep

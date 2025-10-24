@@ -78,9 +78,7 @@ class Qfunction(object):
         q_all = self.model(states)  # (N, actsize)
         return torch.max(q_all, dim=1).values
 
-    def compute_argmaxQ(
-        self, state: np.ndarray | torch.Tensor, epsilon: float
-    ) -> np.int64:
+    def compute_argmaxQ(self, state: np.ndarray | torch.Tensor, epsilon: float = 0):
         """
         input:
             state: (obssize,) or (1, obssize)
@@ -101,7 +99,7 @@ class Qfunction(object):
             q: torch.Tensor = self.model(st)  # (1, A)
             a: int = int(torch.argmax(q, dim=1).item())
 
-        return np.int64(a)
+        return a
 
     def train(
         self,

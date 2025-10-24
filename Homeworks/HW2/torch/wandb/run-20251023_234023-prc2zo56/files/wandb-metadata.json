@@ -1,0 +1,37 @@
+{
+  "os": "macOS-26.0.1-arm64-arm-64bit",
+  "python": "CPython 3.12.11",
+  "startedAt": "2025-10-24T03:40:23.863872Z",
+  "program": "/Users/Akseldkw/Desktop/Columbia/ORCS4529/Homeworks/HW2/torch/lab2_dqn_torch.ipynb",
+  "codePath": "Homeworks/HW2/torch/lab2_dqn_torch.ipynb",
+  "codePathLocal": "lab2_dqn_torch.ipynb",
+  "git": {
+    "remote": "git@github.com:akseldkw07/ORCS4529.git",
+    "commit": "1435504e15043db98b8bf18ea6b463b4e700f222"
+  },
+  "email": "akseldkw@gmail.com",
+  "root": "/Users/Akseldkw/Desktop/Columbia/ORCS4529/Homeworks/HW2/torch",
+  "host": "Aksels-Macbook-256.local",
+  "executable": "/Users/Akseldkw/micromamba/envs/kret_312/bin/python",
+  "cpu_count": 10,
+  "cpu_count_logical": 10,
+  "disk": {
+    "/": {
+      "total": "994662584320",
+      "used": "858402983936"
+    }
+  },
+  "memory": {
+    "total": "34359738368"
+  },
+  "apple": {
+    "name": "Apple M1 Max",
+    "ecpuCores": 2,
+    "pcpuCores": 8,
+    "gpuCores": 24,
+    "memoryGb": 32,
+    "swapTotalBytes": "1073741824",
+    "ramTotalBytes": "34359738368"
+  },
+  "writerId": "e770eh9dkjmvfnokg7dfba0cdzw8nrqq"
+}
