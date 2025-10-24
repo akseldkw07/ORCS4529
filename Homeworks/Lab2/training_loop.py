@@ -1,11 +1,6 @@
 import numpy as np
 import wandb
-import torch
-import typing as t
-from gymnasium.wrappers.common import TimeLimit
-from gymnasium.spaces import Discrete, Box
 import tqdm
-import q_model as q_model
 from q_model import Qfunction
 from replay_buffer import ReplayBuffer
 from gymnasium.envs.classic_control.cartpole import CartPoleEnv
@@ -81,9 +76,7 @@ def training_loop(
             # compute targets in batch using Qtarget and train Qprincipal
             if totalstep > initialsize and totalstep % trainfreq == 0:
                 # sample a minibatch
-                states, actions, rewards, newstates, dones = buffer.sample_batch(
-                    batchsize, decay_denom=maxlength
-                )
+                states, actions, rewards, newstates, dones = buffer.sample_batch(batchsize, decay_denom=maxlength)
 
                 # compute max_a Q(s', a) with the TARGET net; ensure it's 1-D (N,)
                 qnews = Qtarget.compute_maxQvalues(newstates).detach().view(-1)
@@ -92,7 +85,7 @@ def training_loop(
                 targets_t = rewards + gamma * (1.0 - dones) * qnews.numpy()
 
                 # train principal net (expects NumPy or Torch? yours accepts either; let’s pass Torch)
-                loss = Qprincipal.train(states, actions, targets_t)
+                Qprincipal.train(states, actions, targets_t)
 
             # UPDATE target network
             # every tau steps update copy the principal network to the target network
@@ -110,22 +103,14 @@ def training_loop(
 
         # printing functions for debugging purposes. Feel free to add more
         if print_debug and episode % 10 == 0:
-            print("buffersize {}".format(len(buffer)))
-            print(
-                "episode {} ave training returns {}".format(
-                    episode, np.mean(rrecord[-10:])
-                )
-            )
+            print(f"buffersize {len(buffer)}")
+            print(f"episode {episode} ave training returns {np.mean(rrecord[-10:])}")
 
         # printing moving averages for smoothed visualization.
         fixedWindow = 100
         movingAverage = 0
         if len(rrecord) >= fixedWindow:
-            movingAverage = np.mean(
-                rrecord[len(rrecord) - fixedWindow : len(rrecord) - 1]
-            )
-        wandb.log(
-            {"training reward": rsum, "train reward moving average": movingAverage}
-        )
+            movingAverage = np.mean(rrecord[len(rrecord) - fixedWindow : len(rrecord) - 1])
+        wandb.log({"training reward": rsum, "train reward moving average": movingAverage})
 
     return rrecord, totalstep
