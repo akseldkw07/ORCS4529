@@ -15,9 +15,11 @@
 	],
 	"settings": {
 		"python.defaultInterpreterPath": "/Users/Akseldkw/micromamba/envs/kret_312/bin/python",
+		"jupyter.defaultKernel": "/Users/Akseldkw/micromamba/envs/kret_312/bin/python",
 		"chatgpt.openOnStartup": false,
 		"codegraphy.connectionType": "Interaction",
 		"codegraphy.nodeSize": "Lines",
-		"codegraphy.showNodeModules": false
+		"codegraphy.showNodeModules": false,
+		"jupyter.interactiveWindow.creationMode": "perFile"
 	}
 }
