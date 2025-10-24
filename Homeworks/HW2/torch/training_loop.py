@@ -80,31 +80,14 @@ def training_loop(
                     batchsize, decay_denom=maxlength
                 )
 
-                # convert ALL batch arrays to torch on the same device
-                device = next(Qtarget.model.parameters()).device
-                states_t = torch.as_tensor(states, dtype=torch.float32, device=device)
-                actions_t = torch.as_tensor(actions, dtype=torch.long, device=device)
-                rewards_t = torch.as_tensor(rewards, dtype=torch.float32, device=device)
-                newstates_t = torch.as_tensor(
-                    newstates, dtype=torch.float32, device=device
-                )
-                dones_t = torch.as_tensor(
-                    dones, dtype=torch.float32, device=device
-                )  # {0,1} → float
-
                 # compute max_a Q(s', a) with the TARGET net; ensure it's 1-D (N,)
-                qnews = Qtarget.compute_maxQvalues(newstates_t).detach().view(-1)
-
-                # sanity check (optional, great for catching mismatches fast)
-                assert (
-                    qnews.shape == rewards_t.shape
-                ), f"qnews {qnews.shape} vs rewards {rewards_t.shape}"
+                qnews = Qtarget.compute_maxQvalues(newstates).detach().view(-1)
 
                 # Bellman targets: d = r + γ * (1 - done) * max_a Q_target(s', a)
-                targets_t = rewards_t + gamma * (1.0 - dones_t) * qnews
+                targets_t = rewards + gamma * (1.0 - dones) * qnews
 
                 # train principal net (expects NumPy or Torch? yours accepts either; let’s pass Torch)
-                loss = Qprincipal.train(states_t, actions_t, targets_t)
+                loss = Qprincipal.train(states, actions, targets_t)
 
             # UPDATE target network
             # every tau steps update copy the principal network to the target network

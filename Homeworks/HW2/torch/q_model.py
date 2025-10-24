@@ -66,14 +66,14 @@ class Qfunction(object):
         q_all = self.model(states)  # (N, 2)
         return q_all.gather(1, actions).squeeze(1)
 
-    def compute_maxQvalues(self, states: torch.Tensor) -> torch.Tensor:
+    def compute_maxQvalues(self, states: torch.Tensor | np.ndarray) -> torch.Tensor:
         """
         input: a list of numsamples states
         output: max_a Q(s,a) values for every input state s in states. The output will have size numsamples
         """
         # Below is example code when neural network is set to take as input state and output Q-value for all actions.
         # if the neural takes as input a state-action pair, then the code will need to loop over all actions to compute all values
-
+        states = torch.from_numpy(states) if isinstance(states, np.ndarray) else states
         states = states.float().view(-1, self.obssize)  # <— force (N, 4)
         q_all = self.model(states)  # (N, actsize)
         return torch.max(q_all, dim=1).values
