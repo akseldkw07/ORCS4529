@@ -34,9 +34,7 @@ class ReplayBuffer(deque[Transition]):
         weights = unweighted / np.sum(unweighted)
 
         batch_size = min(batch_size, len(self))
-        self.idxs_last = np.random.choice(
-            len(self), batch_size, replace=False, p=weights
-        )
+        self.idxs_last = np.random.choice(len(self), batch_size, replace=False, p=weights)
 
     def sample_batch(self, batch_size: int, decay_denom: int | None = None):
         """
