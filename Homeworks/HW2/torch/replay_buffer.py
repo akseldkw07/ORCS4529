@@ -29,7 +29,7 @@ class ReplayBuffer(deque[Transition]):
     def __init__(self, maxlen: int):
         super().__init__(maxlen=maxlen)
 
-    def sample_batch(self, batch_size: int, decay_denom: int | None = None):
+    def _sample_idxs(self, batch_size: int, decay_denom: int | None = None):
         unweighted = get_weights(self.maxlen, decay_denom or self.maxlen)[0 : len(self)]
         weights = unweighted / np.sum(unweighted)
 
@@ -37,6 +37,27 @@ class ReplayBuffer(deque[Transition]):
         self.idxs_last = np.random.choice(
             len(self), batch_size, replace=False, p=weights
         )
+
+    def sample_batch(self, batch_size: int, decay_denom: int | None = None):
+        self._sample_idxs(batch_size, decay_denom)
+
+        # in ReplayBuffer.sample_batch, just before returning
+        s, a, r, s2, d = zip(*(self[i] for i in self.idxs_last))
+
+        fix = lambda x: np.asarray(x, dtype=np.float32).reshape(-1)  # force (4,)
+        states = np.stack([fix(si) for si in s])
+        newst = np.stack([fix(s2i) for s2i in s2])
+
+        return (
+            states,
+            np.asarray(a),
+            np.asarray(r, dtype=np.float32),
+            newst,
+            np.asarray(d, dtype=np.bool_),
+        )
+
+    def sample_batch_deprecated(self, batch_size: int, decay_denom: int | None = None):
+        self._sample_idxs(batch_size, decay_denom)
 
         # return [self[i] for i in idxs]
         s, a, r, s2, d = zip(*(self[i] for i in self.idxs_last))
