@@ -1,0 +1,167 @@
+\makeatletter
+\def\input@path{{../}{../../}{../../../}} % add as many parents as you need
+\makeatother
+\input{pset_template.tex}
+
+\begin{document}
+
+\section*{Lecture 4 Summary: Policy Gradient Methods}
+
+\subsection*{1. Motivation}
+
+Value-based methods (e.g., Value Iteration, Q-Learning) learn value functions and then act greedily.
+However, they can become unstable or inefficient with nonlinear function approximation.
+Policy-gradient methods instead \emph{directly} parameterize and optimize the policy itself:
+\[
+		J(\theta) = \mathbb{E}_{\pi_\theta}\!\left[ \sum_{t=0}^{\infty} \gamma^t r_t \right].
+\]
+The goal is to find parameters $\theta$ that maximize $J(\theta)$.
+
+\subsection*{2. Stochastic Policy Parameterizations}
+
+\begin{table}[h!]
+		\centering
+		\begin{tabular}{lll}
+				\toprule
+				\textbf{Setting} & \textbf{Example} & \textbf{Log-gradient} \\
+				\midrule
+				\textbf{Discrete actions} &
+				Softmax over features $f_\theta(s,a)$:
+				\[
+						\pi_\theta(a|s) = \frac{e^{f_\theta(s,a)}}{\sum_{a'} e^{f_\theta(s,a')}}
+				\]
+				&
+				\[
+						\nabla_\theta \log \pi_\theta(a|s)
+						= \nabla_\theta f_\theta(s,a)
+						- \sum_{a'} \pi_\theta(a'|s)\,\nabla_\theta f_\theta(s,a')
+				\]
+				\\[1.2em]
+				\textbf{Continuous actions} &
+				Gaussian policy $\mathcal{N}(\mu_\theta(s), \sigma^2)$ &
+				\[
+						\nabla_\theta \log \pi_\theta(a|s)
+						= \frac{(a - \mu_\theta(s))}{\sigma^2}\,\nabla_\theta \mu_\theta(s)
+				\]
+				\\
+				\bottomrule
+		\end{tabular}
+		\caption{Common stochastic policy parameterizations and their log-gradients.}
+\end{table}
+
+These forms make $\nabla_\theta \log \pi_\theta(a|s)$ directly computable by autodiff.
+
+\subsection*{3. Policy Gradient Theorem}
+
+The \emph{Policy Gradient Theorem} gives a simple, model-free expression for the gradient:
+\[
+		\nabla_\theta J(\theta)
+		= \mathbb{E}_{s \sim d^{\pi_\theta},\, a \sim \pi_\theta}
+		\!\big[ Q^{\pi_\theta}(s,a)\,\nabla_\theta \log \pi_\theta(a|s) \big].
+\]
+Key insight: the derivative does not include $\nabla_\theta d^{\pi_\theta}(s)$,
+so we can estimate this gradient using on-policy samples.
+
+\subsection*{4. REINFORCE Algorithm (Williams, 1992)}
+
+A Monte Carlo estimator of the gradient:
+\[
+		\hat{g} = \sum_{t=0}^{T-1} R_t \, \nabla_\theta \log \pi_\theta(a_t|s_t),
+		\quad
+		R_t = \sum_{t' \ge t} \gamma^{t'-t} r_{t'}.
+\]
+\begin{algorithm}[H]
+		\caption{REINFORCE}
+		\begin{algorithmic}
+				\State Initialize policy parameters $\theta$
+				\For{each episode}
+				\State Sample trajectory $\tau = (s_0,a_0,r_0,\ldots,s_T)$ under $\pi_\theta$
+				\For{each timestep $t$ in $\tau$}
+    \State Compute return $R_t = \sum_{t' \ge t} \gamma^{t'-t} r_{t'}$
+    \State $\theta \leftarrow \theta + \alpha R_t \nabla_\theta \log \pi_\theta(a_t|s_t)$
+				\EndFor
+				\EndFor
+		\end{algorithmic}
+\end{algorithm}
+
+REINFORCE is unbiased but has high variance.
+
+\subsection*{5. Variance Reduction via Baselines}
+
+Subtracting a baseline $b(s)$ that does not depend on $a$ leaves the gradient unbiased:
+\[
+		\nabla_\theta J(\theta)
+		= \mathbb{E}\!\left[ (Q^\pi(s,a) - b(s)) \, \nabla_\theta \log \pi_\theta(a|s) \right].
+\]
+Choosing $b(s) = V^\pi(s)$ minimizes variance and defines the \emph{Advantage}:
+\[
+		A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s).
+\]
+The update then becomes:
+\[
+		\theta \leftarrow \theta + \alpha A_t \, \nabla_\theta \log \pi_\theta(a_t|s_t).
+\]
+
+\subsection*{6. Actor--Critic Methods}
+
+In practice, $Q^\pi$ or $V^\pi$ are unknown and learned with a \emph{critic}.
+The critic minimizes TD-error:
+\[
+		\delta_t = r_t + \gamma V_\omega(s_{t+1}) - V_\omega(s_t),
+		\qquad
+		\omega \leftarrow \omega - \beta \, \delta_t \nabla_\omega V_\omega(s_t).
+\]
+The actor then updates using $\delta_t$ as a low-variance estimate of the advantage:
+\[
+		\theta \leftarrow \theta + \alpha \, \delta_t \, \nabla_\theta \log \pi_\theta(a_t|s_t).
+\]
+
+\subsection*{7. Average Reward (Undiscounted) Case}
+
+For continuing tasks, the objective is the average steady-state reward:
+\[
+		\rho^\pi = \sum_s d^\pi(s) \sum_a \pi(a|s) R(s,a),
+\]
+and the gradient takes the same form:
+\[
+		\nabla_\theta \rho^\pi
+		= \mathbb{E}_{s,a \sim \pi}\!\left[
+				A^\pi(s,a)\,\nabla_\theta \log \pi_\theta(a|s)
+		\right].
+\]
+
+\subsection*{8. Conservative and Trust-Region Policy Updates}
+
+Large policy changes can degrade performance.
+To guarantee monotonic improvement:
+\[
+		\pi_{k+1} = (1-\alpha)\pi_k + \alpha \pi^*_k,
+\]
+or impose a KL constraint (as in TRPO):
+\[
+		\max_\theta
+		\mathbb{E}\left[
+				\frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)} A^{\pi_{\theta_{\text{old}}}}(s,a)
+		\right]
+		\text{ subject to }
+		\mathbb{E}\!\left[ \mathrm{KL}(\pi_{\theta_{\text{old}}}\,\|\,\pi_\theta) \right] \le \delta.
+\]
+The practical approximation is PPO’s \emph{clipped surrogate} objective.
+
+\subsection*{9. Key Takeaways}
+
+\begin{itemize}
+		\item Policy Gradient Theorem enables model-free differentiation of expected return.
+		\item REINFORCE is unbiased but high-variance; baselines reduce variance.
+		\item Actor--Critic uses bootstrapped value estimates to stabilize learning.
+		\item TRPO/PPO constrain policy updates for reliable improvement.
+		\item Policy-based methods handle continuous actions and stochasticity naturally.
+\end{itemize}
+
+\noindent
+\textbf{In one line:}
+Policy gradient methods learn by differentiating through the policy itself;
+REINFORCE provides the estimator, baselines and critics control variance,
+and trust-region methods make deep RL stable.
+
+\end{document}
