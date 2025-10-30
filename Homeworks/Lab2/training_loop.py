@@ -4,6 +4,7 @@ import tqdm
 from q_model import Qfunction
 from replay_buffer import ReplayBuffer
 from gymnasium.envs.classic_control.cartpole import CartPoleEnv
+from kret_studies import kret_torch as uks_torch
 
 # from .q_model import Qfunction
 # from .replay_buffer import ReplayBuffer
@@ -11,10 +12,10 @@ from gymnasium.envs.classic_control.cartpole import CartPoleEnv
 # remove above line if you do not want to see inline plots from wandb
 
 # hyper-parameters
+envname = "CartPole-v0"  # environment name
 lr = 1e-3  # learning rate for gradient update
 batchsize = 64  # batchsize for buffer sampling
 maxlength = 1000  # max number of tuples held by buffer
-envname = "CartPole-v0"  # environment name
 tau = 100  # time steps for target update
 episodes = 300  # number of episodes to run
 initialsize = 500  # initial time steps before start training
@@ -22,6 +23,8 @@ trainfreq = 10  # frequency of training steps
 epsilon = 0.2  # constant for exploration
 gamma = 0.99  # discount
 print_debug = False  # whether to print debug info
+max_episode_steps = 200  # max number of steps per episode
+epsilon_init = 0.5  # initial epsilon for exploration
 # initialize environment
 # env: TimeLimit = gym.make(envname)
 # env.observation_space = t.cast(Box, env.observation_space)
@@ -59,9 +62,10 @@ def training_loop(
 
         while not done:
             # greedy choice below. Use epsilon greedy for exploration
+            epsilon = uks_torch.exp_decay(episode, epsilon_init, half_life=500)
             action = Qprincipal.compute_argmaxQ(np.expand_dims(obs, 0), epsilon=epsilon)
 
-            newobs, r, done, _, info = env.step(action)
+            newobs, r, done, trunc, info = env.step(action)
             done_ = 1 if done else 0
             e = (obs, action, r, done_, newobs)
 
@@ -78,13 +82,11 @@ def training_loop(
                 # sample a minibatch
                 states, actions, rewards, newstates, dones = buffer.sample_batch(batchsize, decay_denom=maxlength)
 
-                # compute max_a Q(s', a) with the TARGET net; ensure it's 1-D (N,)
                 qnews = Qtarget.compute_maxQvalues(newstates).detach().view(-1)
 
                 # Bellman targets: d = r + γ * (1 - done) * max_a Q_target(s', a)
                 targets_t = rewards + gamma * (1.0 - dones) * qnews.numpy()
 
-                # train principal net (expects NumPy or Torch? yours accepts either; let’s pass Torch)
                 Qprincipal.train(states, actions, targets_t)
 
             # UPDATE target network
@@ -96,6 +98,7 @@ def training_loop(
             totalstep += 1
             rsum += r  # type: ignore
             obs = newobs
+            done = done or rsum > max_episode_steps  # to avoid truncation issues
 
         # The code below is for printing and debugging at the end of episode
 
@@ -112,5 +115,4 @@ def training_loop(
         if len(rrecord) >= fixedWindow:
             movingAverage = np.mean(rrecord[len(rrecord) - fixedWindow : len(rrecord) - 1])
         wandb.log({"training reward": rsum, "train reward moving average": movingAverage})
-
-    return rrecord, totalstep
+        return rrecord, totalstep
