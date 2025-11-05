@@ -1,7 +1,8 @@
 # TODO: define value function as a class. You need to define the model and set the loss.
-from collections.abc import Callable
+
 import torch
 import numpy as np
+from collections.abc import Callable
 
 
 class ValueFunction:
