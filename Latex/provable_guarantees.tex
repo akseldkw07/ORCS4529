@@ -1,0 +1,157 @@
+\documentclass[12pt]{article}
+
+% Use algorithm and algpseudocode packages so \State and related commands are available
+
+\newcommand{\duedate}{---}
+\newcommand{\assignment}{Provable-Guarantees (Lec6) Summary} % Change to "Problem Set X"
+
+% Change the following to your name and UNI.
+\newcommand{\name}{Aksel Kretsinger-Walters, adk2164}
+\newcommand{\email}{adk2164@columbia.edu}
+
+% NOTE: Defining collaborators is optional; to not list collaborators, comment out the
+% line below. Maximum of two collaborators per problem set.
+%\newcommand{\collaborators}{Vig Vigerton (\texttt{UNI}), Alice Bob (\texttt{UNI})}
+% No collaborators on PS 0
+
+\makeatletter
+\def\input@path{{../}{../../}{../../../}} % add as many parents as you need
+\makeatother
+\input{pset_template_RL.tex} %% DO NOT CHANGE THIS LINE
+
+\begin{document}
+\psetheader %% DO NOT CHANGE THIS LINE
+
+\section*{Lecture 6 Summary: Provable Guarantees for Policy Gradient Methods}
+
+\subsection*{Overview}
+This lecture studies the theoretical foundations and convergence guarantees of policy
+gradient methods, based on \textit{Kakade \& Langford (2002)} and \textit{Schulman et al.
+(2015)}. It highlights situations where naive policy gradient updates fail, and presents
+provably efficient variants such as the \emph{Conservative Greedy Algorithm} and
+\emph{Trust Region Policy Optimization (TRPO)}.
+
+\subsection*{1. When Policy Gradients Fail}
+
+\paragraph{Example 1 – Exponential Trajectories.}
+In a chain MDP where each state $s \in \{n,\dots,1\}$ has two forward actions and one
+backward action, the uniform policy’s probability of reaching the rewarding state 1
+decays exponentially with $n$.
+Hence, the expected gradient magnitude
+\[
+		\|\nabla_\theta \rho(\pi)\| \le \frac{n}{1-\gamma}\left(\frac{1}{2}\right)^{n/2},
+\]
+implying exponentially many samples are needed to obtain a nonzero gradient estimate.
+
+\paragraph{Example 2 – Two-State Trap.}
+Even with two states $(i,j)$, policy gradients may worsen the policy.
+Because gradient updates scale with the stationary distribution $d^\pi(s)$,
+the high-probability state $i$ dominates learning.
+The update
+\[
+		\theta_{s,a} \leftarrow \theta_{s,a} + \alpha\,
+		d^\pi(s)\pi_\theta(s,a)\big(Q^\pi(s,a)-V^\pi(s)\big)
+\]
+can increase the probability of looping on $i$, worsening performance before eventual
+recovery in exponential time.
+
+\subsection*{2. Performance Difference Lemma}
+
+A key result that underlies all policy improvement analysis:
+\[
+		\rho(\tilde\pi)-\rho(\pi)
+		= \frac{1}{1-\gamma}\,
+		\mathbb{E}_{s\sim(1-\gamma)d^{\tilde\pi},\,a\sim\tilde\pi}
+		[A^\pi(s,a)],
+		\quad A^\pi(s,a)=Q^\pi(s,a)-V^\pi(s).
+\]
+This identity expresses the performance gap between any two policies in terms of the
+\emph{advantage} of $\pi$ under the new policy’s state distribution.
+
+\subsection*{3. Conservative Greedy Policy Improvement}
+
+To ensure monotonic improvement, \textit{Kakade \& Langford (2002)} propose the update:
+\[
+		\pi_{\text{new}}(s,a) = (1-\alpha)\pi(s,a) + \alpha\pi'(s,a),
+\]
+where $\pi'$ is a candidate (greedy) policy and $\alpha$ controls conservativeness.
+
+\paragraph{Guaranteed Improvement.}
+For any $\pi'$,
+\[
+		\rho(\pi_{\text{new}}) - \rho(\pi)
+		\ge \alpha\,A_\pi(\pi') - \frac{2\alpha^2\gamma\epsilon}{1-\gamma(1-\alpha)},
+\]
+where
+\[
+		A_\pi(\pi') = \tfrac{1}{1-\gamma}\mathbb{E}_{s,a\sim d^\pi,\pi'}[A_\pi(s,a)],\quad
+		\epsilon = \tfrac{1}{1-\gamma}\max_s\big|\!\sum_a \pi'(s,a)A_\pi(s,a)\big|.
+\]
+
+\paragraph{Choosing Parameters.}
+If rewards are bounded by $R$, selecting
+\[
+		\alpha = \frac{A_\pi(\pi')(1-\gamma)^3}{4R}
+\]
+yields the provable bound
+\[
+		\rho(\pi_{\text{new}}) - \rho(\pi)
+		\ge \frac{(1-\gamma)^3A_\pi(\pi')^2}{8R}.
+\]
+Thus each update is guaranteed non-negative improvement.
+
+\paragraph{Termination Guarantee.}
+The conservative greedy algorithm stops after at most
+\[
+		O\!\left(\frac{R^2}{\delta^2}\right)
+\]
+iterations to find a $\pi$ satisfying
+\[
+		(1-\gamma)\max_{\pi'}A_\pi(\pi')\le \delta.
+\]
+
+\subsection*{4. Local vs. Global Optimality}
+
+Even a locally optimal policy can differ significantly from the global optimum if state
+distributions differ.
+\[
+		\rho(\pi^*;\mu^*) - \rho(\pi;\mu^*)
+		\le \frac{\delta}{(1-\gamma)^2}
+		\left\|\frac{d_{\pi^*,\mu^*}}{d_{\pi,\mu}}\right\|_\infty.
+\]
+Choosing a more uniform initial state distribution mitigates this gap.
+
+\subsection*{5. Trust Region Policy Optimization (TRPO)}
+
+\textit{Schulman et al. (2015)} generalized the conservative update by replacing the
+mixture constraint with a \emph{trust region} constraint based on total-variation or KL divergence:
+\[
+		\rho(\tilde\pi)-\rho(\pi)
+		\ge A_\pi(\tilde\pi)
+		- \frac{2\gamma\epsilon}{1-\gamma}\, D^{\max}_{TV}(\pi,\tilde\pi)^2
+		\ge A_\pi(\tilde\pi)
+		- \frac{4\gamma\epsilon}{1-\gamma}\, D^{\max}_{KL}(\pi,\tilde\pi).
+\]
+This ensures safe updates without forming explicit policy mixtures.
+
+\paragraph{TRPO Objective.}
+Find the next policy parameter $\tilde\theta$ by solving
+\[
+		\max_{\tilde\theta}\; A_\theta(\tilde\theta)
+		\quad\text{s.t.}\quad
+		D^{\max}_{KL}\big(\pi_\theta\,\|\,\pi_{\tilde\theta}\big)\le \eta,
+\]
+where $\eta$ controls the trust-region size.
+
+\subsection*{6. Key Takeaways}
+\begin{itemize}
+  \item Naive policy gradients can converge exponentially slowly or even worsen performance.
+		\item The \textbf{Performance Difference Lemma} formalizes exact performance change
+				between policies.
+  \item \textbf{Conservative Greedy Algorithm} ensures monotonic improvement via step-size control.
+  \item \textbf{TRPO} removes mixtures by constraining updates through KL or TV divergence.
+		\item Both frameworks form the theoretical foundation for modern stable policy-gradient
+				methods (e.g., PPO).
+\end{itemize}
+
+\end{document}

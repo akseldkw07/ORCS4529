@@ -46,11 +46,6 @@ class Qfunction:
         zeros = torch.zeros(*y.size(), num_classes, dtype=y.dtype)
         return zeros.scatter(scatter_dim, y_tensor, 1)
 
-        y = y.view(-1, 1).long()
-        out = torch.zeros(y.size(0), num_classes, dtype=torch.float32, device=y.device)
-        out.scatter_(1, y, 1.0)
-        return out
-
     def compute_Qvalues(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
         """
         input: list of numsamples state-action pairs
@@ -83,10 +78,7 @@ class Qfunction:
         output:
             greedy action index as np.int64
         """
-        if isinstance(state, np.ndarray):
-            st = torch.from_numpy(state).float()
-        else:
-            st = state.float()
+        st = torch.from_numpy(state).float() if isinstance(state, np.ndarray) else state.float()
 
         if st.dim() == 1:
             st = st.unsqueeze(0)  # (1, S)
