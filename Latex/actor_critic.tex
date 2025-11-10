@@ -1,0 +1,135 @@
+\documentclass[12pt]{article}
+
+% Use algorithm and algpseudocode packages so \State and related commands are available
+
+\newcommand{\duedate}{---}
+\newcommand{\assignment}{Actor-Critic (Lec5) Summary} % Change to "Problem Set X"
+
+% Change the following to your name and UNI.
+\newcommand{\name}{Aksel Kretsinger-Walters, adk2164}
+\newcommand{\email}{adk2164@columbia.edu}
+
+% NOTE: Defining collaborators is optional; to not list collaborators, comment out the
+% line below. Maximum of two collaborators per problem set.
+%\newcommand{\collaborators}{Vig Vigerton (\texttt{UNI}), Alice Bob (\texttt{UNI})}
+% No collaborators on PS 0
+
+\makeatletter
+\def\input@path{{../}{../../}{../../../}} % add as many parents as you need
+\makeatother
+\input{pset_template_RL.tex} %% DO NOT CHANGE THIS LINE
+
+\begin{document}
+\psetheader %% DO NOT CHANGE THIS LINE
+
+\section*{Lecture 5 Summary: Actor--Critic Methods}
+
+\subsection*{Overview}
+Actor--critic algorithms combine the strengths of actor-only (policy gradient) and
+critic-only (value-based) approaches.
+\begin{itemize}
+		\item \textbf{Actor-only methods} directly optimize policy parameters $\theta$ using
+				Monte Carlo estimates of the policy gradient. They can suffer from high variance and
+				lack memory of past estimates.
+		\item \textbf{Critic-only methods} (e.g., Q-learning, TD-learning) focus on
+				value-function approximation, indirectly deriving a policy but without direct
+				gradient optimization guarantees.
+\end{itemize}
+Actor--critic methods blend both ideas: they estimate value functions (the \emph{critic})
+to stabilize and reduce variance in the policy gradient update (the \emph{actor}).
+
+\subsection*{1. Policy Gradient Theorem with Q-Function Approximation}
+Recall the policy gradient theorem:
+\[
+		\nabla_\theta \rho(\pi_\theta)
+		= \sum_s d^{\pi_\theta}(s) \, \mathbb{E}_{a \sim \pi_\theta(\cdot|s)}
+		\left[ (Q^{\pi_\theta}(s,a) - b^{\pi_\theta}(s)) \nabla_\theta \log \pi_\theta(s,a) \right].
+\]
+Instead of Monte Carlo estimates of $Q^{\pi_\theta}$, actor--critic methods approximate
+the $Q$-function by a parametric model $f_\omega(s,a) \approx Q^{\pi_\theta}(s,a)$.
+
+\paragraph{Theorem (Sutton et al., 1999).}
+If $f_\omega$ satisfies the \textbf{compatibility condition}
+\[
+		\nabla_\omega f_\omega(s,a)
+		= \frac{1}{\pi_\theta(s,a)} \nabla_\theta \pi_\theta(s,a)
+		= \nabla_\theta \log \pi_\theta(s,a),
+\]
+and $\omega$ minimizes
+\[
+		\min_\omega \; \mathbb{E}_{s \sim d^{\pi_\theta}, a \sim \pi_\theta}
+		\!\left[ \big(Q^{\pi_\theta}(s,a) - b(s;\theta) - f_\omega(s,a)\big)^2 \right],
+\]
+then
+\[
+		\nabla_\theta \rho(\pi_\theta)
+		= \mathbb{E}_{s,a \sim \pi_\theta} \!\left[f_\omega(s,a)\,\nabla_\theta \log
+		\pi_\theta(s,a)\right].
+\]
+
+Thus, $f_\omega$ can safely replace $Q^{\pi_\theta}$ in the policy gradient.
+
+\subsection*{2. Examples of Compatible Function Approximators}
+\paragraph{Softmax policy:}
+\[
+		\pi_\theta(s,a) = \frac{e^{\theta^\top \phi_{s,a}}}{\sum_{a'} e^{\theta^\top \phi_{s,a'}}},
+		\quad
+		f_\omega(s,a) = \omega^\top (\phi_{s,a} - \sum_{b} \pi_\theta(s,b)\phi_{s,b}).
+\]
+The critic thus learns a linear function in the same features as the policy—effectively
+an approximation of the \emph{advantage function}.
+
+\paragraph{Gaussian policy (continuous actions):}
+\[
+		\pi_\theta(s,a) = \mathcal{N}(\phi(s)^\top \theta, \sigma^2), \quad
+		f_\omega(s,a) = \frac{(a - \theta^\top \phi(s))}{\sigma^2}\phi(s)^\top \omega.
+\]
+
+\subsection*{3. Actor--Critic Algorithm}
+For each iteration $k$:
+\begin{enumerate}
+		\item \textbf{Policy evaluation:}
+    \[
+						\mathbb{E}_{s,a \sim \pi_k}\!\left[(Q^{\pi_k}(s,a) - b_k(s) - f_\omega(s,a))
+						\nabla_\omega f_\omega(s,a)\right] = 0.
+    \]
+		\item \textbf{Policy improvement:}
+    \[
+						\theta_{k+1} \leftarrow \theta_k + \alpha_k \,
+						\mathbb{E}_{s,a \sim \pi_k}\!\left[f_\omega(s,a)\,\nabla_\theta \log \pi_k(s,a)\right].
+    \]
+\end{enumerate}
+This framework updates the critic (value approximation) and actor (policy parameters)
+simultaneously.
+
+\subsection*{4. Convergence Guarantees (Sutton et al., 1999)}
+Under standard stochastic approximation conditions:
+\[
+		\sum_k \alpha_k = \infty, \quad \sum_k \alpha_k^2 < \infty,
+\]
+and bounded second derivatives of $\pi_\theta(s,a)$, we have:
+\[
+		\lim_{k \to \infty} \nabla_\theta \rho(\pi_{\theta_k}) = 0.
+\]
+In practice, convergence depends on accurate critic training, stable sampling, and small
+gradient noise.
+
+\subsection*{5. Discussion and Modern Extensions}
+While theoretically sound, this basic actor--critic scheme is sensitive to approximation
+errors. Later works addressed instability and efficiency:
+\begin{itemize}
+		\item \textbf{Kakade \& Langford (2002)}: Highlighted instability and proposed
+				trust-region improvements.
+		\item \textbf{TRPO (Schulman et al., 2015a)}: Enforces a KL-divergence constraint on
+				policy updates for stability.
+		\item \textbf{A3C (Mnih et al., 2016)}: Parallel asynchronous advantage actor--critic.
+		\item \textbf{GAE (Schulman et al., 2015b)}: Improves bias--variance tradeoff via
+				temporal discounting of advantages.
+\end{itemize}
+
+\subsection*{6. Key Insight}
+Actor--critic = \textbf{policy gradient + learned baseline}.
+The critic provides low-variance, bootstrapped estimates of $Q^\pi$ or $A^\pi$, while the
+actor performs gradient ascent using those estimates.
+
+\end{document}
