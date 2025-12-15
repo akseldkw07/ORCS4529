@@ -1,0 +1,233 @@
+\documentclass[12pt]{article}
+\usepackage{tabularx}
+
+% Use algorithm and algpseudocode packages so \State and related commands are available
+
+\newcommand{\duedate}{---}
+\newcommand{\assignment}{MARL (Lec6) Summary} % Change to "Problem Set X"
+
+% Change the following to your name and UNI.
+\newcommand{\name}{Aksel Kretsinger-Walters, adk2164}
+\newcommand{\email}{adk2164@columbia.edu}
+
+% NOTE: Defining collaborators is optional; to not list collaborators, comment out the
+% line below. Maximum of two collaborators per problem set.
+%\newcommand{\collaborators}{Vig Vigerton (\texttt{UNI}), Alice Bob (\texttt{UNI})}
+% No collaborators on PS 0
+
+\makeatletter
+\def\input@path{{../}{../../}{../../../}} % add as many parents as you need
+\makeatother
+\input{pset_template_RL.tex} %% DO NOT CHANGE THIS LINE
+
+\begin{document}
+\psetheader %% DO NOT CHANGE THIS LINE
+
+\section*{Lecture Summary: Multi-Agent Reinforcement Learning (MARL)}
+
+\subsection*{1. Motivation}
+In classical RL, the environment is stationary and external.
+In \emph{multi-agent} settings, other agents \emph{are} part of the environment:
+they learn, adapt, and respond.
+Thus, single-agent RL assumptions break down, and game-theoretic ideas become essential.
+
+\section*{2. Game Theory Basics}
+
+\subsection*{One-Shot Games}
+A normal-form game consists of:
+\begin{itemize}
+		\item players $1,\dots,n$,
+		\item action sets $A_i$,
+		\item utility functions $u_i: A \to \mathbb{R}$ where $A = A_1 \times \cdots \times A_n$.
+\end{itemize}
+
+\paragraph{Best response.}
+Given actions of others $a_{-i}$,
+\[
+		BR_i(a_{-i}) = \arg\max_{a_i \in A_i} u_i(a_i, a_{-i}).
+\]
+
+\paragraph{Dominant strategy.}
+Action $a_i$ \emph{weakly dominates} $a'_i$ if
+\[
+		u_i(a_i,a_{-i}) \ge u_i(a'_i,a_{-i}) \quad \forall a_{-i}.
+\]
+If such an action exists, it is optimal regardless of the opponent’s behavior.
+
+\subsection*{Solution Concepts}
+
+\paragraph{Dominant Strategy Equilibrium (DSE).}
+Each player's action is a dominant strategy.
+
+\paragraph{Nash Equilibrium (NE).}
+An action profile $a=(a_1,\dots,a_n)$ is a NE if every player is playing a best
+response:
+\[
+		u_i(a_i,a_{-i}) \ge \max_{a'_i} u_i(a'_i,a_{-i}).
+\]
+
+\paragraph{Mixed-Strategy NE.}
+Each player uses a distribution $p_i \in \Delta(A_i)$ over actions.
+A profile $p=(p_1,\dots,p_n)$ is NE if:
+\[
+		u_i(p_i,p_{-i}) \ge u_i(a_i,p_{-i}) \quad \forall a_i.
+\]
+
+\paragraph{Nash’s Theorem.}
+Every finite game has a mixed-strategy Nash equilibrium.
+
+\subsection*{Correlated and Coarse-Correlated Equilibria}
+Mixed NE require independent sampling across players.
+\emph{Correlated} equilibria allow a joint distribution $D$ over actions.
+
+\paragraph{Correlated equilibrium (CE).}
+No player benefits from deviating given the recommended action $a_i$:
+\[
+		\mathbb{E}_{a\sim D}[u_i(a_i,a_{-i})]
+		\ge
+		\mathbb{E}_{a\sim D}[u_i(a'_i,a_{-i}) | a_i].
+\]
+
+\paragraph{Coarse CE (CCE).}
+Relaxed condition: no player benefits by switching to a fixed alternative action.
+
+\paragraph{Hierarchy.}
+\[
+		\text{DSE} \subset \text{PSNE} \subset \text{MSNE} \subset \text{CE} \subset \text{CCE}.
+\]
+
+\section*{3. Zero-Sum Games and Minimax}
+
+For two-player zero-sum games ($u_1 = -u_2$),
+the utility can be represented by a matrix $U$.
+
+\subsection*{Minimax Theorem (Von Neumann)}
+\[
+		\min_q \max_p \; p^\top U q
+		=
+		\max_p \min_q \; p^\top U q.
+\]
+The value of the game is $v^*$, and any minimax pair $(p^*,q^*)$ is a Nash equilibrium.
+
+This generalizes to continuous-action games when $u(x,y)$ is convex in $x$ and concave in $y$.
+
+\section*{4. Markov (Stochastic) Games}
+
+\paragraph{Definition.}
+A two-player zero-sum Markov game consists of:
+\[
+		(S, A_1, A_2, P, R),
+\]
+where both players act simultaneously at each step.
+
+\paragraph{Policies.}
+Each player has a Markov policy $\pi_i: S \to \Delta(A_i)$.
+
+\paragraph{Value of policy pair.}
+For discounted infinite horizon,
+\[
+		V^{\pi_1,\pi_2}(s)
+		=
+		\mathbb{E}\left[\sum_{t=1}^\infty \gamma^{t-1} R(s_t,a_{1,t},a_{2,t}) \mid s_1=s\right].
+\]
+
+\subsection*{Minimax for Markov Games (Shapley)}
+There exists a value function $V^*$ such that
+\[
+		V^*(s) = \max_{\pi_1} \min_{\pi_2} V^{\pi_1,\pi_2}(s)
+		= \min_{\pi_2} \max_{\pi_1} V^{\pi_1,\pi_2}(s).
+\]
+Any minimax pair of policies is a Nash equilibrium.
+
+\section*{5. Bellman Equations for Markov Games}
+
+\paragraph{Value form.}
+\[
+		V^*(s)
+		=
+		\max_{p \in \Delta(A_1)}
+		\min_{q \in \Delta(A_2)}
+		\mathbb{E}_{a_1\sim p,\,a_2\sim q}\left[
+				R(s,a_1,a_2)
+				+
+				\gamma P(s,a_1,a_2)V^*
+		\right].
+\]
+
+\paragraph{Q-form.}
+\[
+		Q^*(s,a_1,a_2) = R(s,a_1,a_2) + \gamma P(s,a_1,a_2)V^*(s'),
+\]
+\[
+		V^*(s)
+		=
+		\max_{p}\min_{q} \; p^\top Q^*(s) q.
+\]
+
+Thus, each state defines a \emph{matrix game} whose Nash value determines $V^*(s)$.
+
+\section*{6. Dynamic Programming for Markov Games}
+
+Finite-horizon backward induction:
+\[
+		V^*_k(s)
+		=
+		\max_p \min_q \mathbb{E}_{a_1,a_2}[R(s,a_1,a_2) + \gamma V^*_{k-1}(s')],
+		\qquad V^*_0 = 0.
+\]
+
+\section*{7. Nash Q-Learning}
+
+Hu \& Wellman (2003) generalize Q-learning to two-player zero-sum Markov games.
+
+\subsection*{Algorithm}
+\begin{itemize}
+		\item Observe $s_t$, take action pair $a_t=(a_{1,t},a_{2,t})$.
+		\item Receive reward $r_t$ and next state $s_{t+1}$.
+		\item Compute the Nash value of the next-state matrix game:
+    \[
+						V_{t+1} = \max_p \min_q \; p^\top Q_t(s_{t+1}) q.
+    \]
+		\item Update:
+    \[
+						Q_{t+1}(s_t,a_t)
+						\leftarrow
+						(1-\alpha_t) Q_t(s_t,a_t)
+						+ \alpha_t \left(r_t + \gamma V_{t+1}\right).
+    \]
+\end{itemize}
+
+\subsection*{Convergence}
+If $\sum_t \alpha_t = \infty$, $\sum_t \alpha_t^2 < \infty$, and all state–action pairs are visited
+infinitely often, then:
+\[
+		Q_t \to Q^*.
+\]
+
+\section*{8. Algorithms for Finding Equilibria}
+
+Common iterative schemes:
+\begin{itemize}
+		\item \textbf{Self-play:} each player best-responds to the other (may cycle).
+		\item \textbf{Fictitious play:} each player best-responds to opponent’s empirical distribution. Converges
+				asymptotically in zero-sum games.
+		\item \textbf{Double oracle:} iteratively expand strategy sets with best responses.
+		\item \textbf{Gradient / Mirror descent:} continuous updates for mixed strategies.
+\end{itemize}
+
+\paragraph{Challenges.}
+\begin{itemize}
+		\item Best responses may \emph{not} be Markovian even when optimal policies are.
+		\item Reduction to normal-form games causes exponential blowup.
+		\item MARL is generally non-stationary and violates single-agent assumptions.
+\end{itemize}
+
+\section*{9. Key Takeaways}
+\begin{itemize}
+		\item Multi-agent RL combines sequential decision-making with game theory.
+		\item Nash equilibria, correlated equilibria, and minimax concepts are foundational.
+		\item Markov games extend MDPs to competitive multi-agent settings with strong guarantees.
+		\item Nash Q-learning generalizes value-based RL to adversarial environments.
+		\item Many MARL algorithms face instability due to non-stationarity and equilibrium computation difficulty.
+\end{itemize}
+\end{document}
