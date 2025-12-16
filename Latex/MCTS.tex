@@ -1,0 +1,139 @@
+\documentclass[12pt]{article}
+\usepackage{tabularx}
+
+% Use algorithm and algpseudocode packages so \State and related commands are available
+
+\newcommand{\duedate}{---}
+\newcommand{\assignment}{MCTS (Lec5) Summary} % Change to "Problem Set X"
+
+% Change the following to your name and UNI.
+\newcommand{\name}{Aksel Kretsinger-Walters, adk2164}
+\newcommand{\email}{adk2164@columbia.edu}
+
+% NOTE: Defining collaborators is optional; to not list collaborators, comment out the
+% line below. Maximum of two collaborators per problem set.
+%\newcommand{\collaborators}{Vig Vigerton (\texttt{UNI}), Alice Bob (\texttt{UNI})}
+% No collaborators on PS 0
+
+\makeatletter
+\def\input@path{{../}{../../}{../../../}} % add as many parents as you need
+\makeatother
+\input{pset_template_RL.tex} %% DO NOT CHANGE THIS LINE
+
+\begin{document}
+\psetheader %% DO NOT CHANGE THIS LINE
+
+\section*{Lecture Summary: Monte Carlo Tree Search (MCTS)}
+
+\subsection*{Overview}
+Monte Carlo Tree Search (MCTS) is a simulation–based planning method that combines
+\emph{tree search} with \emph{multi-armed bandit} ideas.
+It is designed for settings where:
+\begin{itemize}
+		\item a simulator exists and can reset to arbitrary states,
+		\item rewards are sparse (often only at terminal states),
+		\item the branching factor is too large for minimax or $\alpha$–$\beta$ pruning,
+		\item exhaustive search is infeasible.
+\end{itemize}
+MCTS adaptively focuses computation on the most promising trajectories and forms the
+core of modern game-playing systems such as MoGo, AlphaGo, AlphaZero, and MuZero.
+
+\subsection*{Historical Motivation}
+Early successes in Computer Go revealed that:
+\begin{itemize}
+		\item high branching factors make classical game-tree search intractable,
+		\item playout (simulation)–based evaluation is effective when a simulator is available,
+		\item bandit algorithms can guide search toward promising moves.
+\end{itemize}
+The key idea: \emph{Tree Search + Bandits = MCTS}.
+Each node in the tree is treated like a bandit problem, and previously successful
+actions are explored more deeply.
+
+\subsection*{Upper Confidence Bounds in Trees (UCT)}
+The most widely used MCTS variant is UCT (Kocsis \& Szepesvári, 2006).
+
+\paragraph{Goal.}
+Find a path from the root to a leaf with highest expected reward in a tree of depth $D$
+and branching factor $K$.
+
+\paragraph{UCT Score.}
+At a node $j$, for each child $k = 1,\dots,K$, UCT selects the child maximizing
+\[
+		B_t(k) \;=\; \hat{\mu}_{k,t}
+		+ c \sqrt{\frac{\log(n_{j,t})}{n_{k,t}}}.
+\]
+Here:
+\begin{itemize}
+		\item $\hat{\mu}_{k,t}$ is the empirical mean reward of subtree $k$,
+		\item $n_{k,t}$ is the number of times child $k$ has been visited,
+		\item $n_{j,t}$ counts visits to node $j$,
+		\item $c > 0$ controls exploration.
+\end{itemize}
+This mirrors the classical UCB rule but is applied hierarchically across the tree.
+
+\subsection*{Phases of the MCTS Algorithm}
+One iteration of MCTS consists of:
+
+\paragraph{1. Selection.}
+Starting at the root, recursively choose the child with highest UCT score until reaching a leaf.
+
+\paragraph{2. Expansion.}
+If the leaf corresponds to a previously visited state and actions remain unexplored,
+create new child nodes (often using a simulator or \texttt{deepcopy}).
+
+\paragraph{3. Simulation (Rollout).}
+Perform a random or heuristic playout from the expanded node until termination,
+generating a Monte-Carlo estimate of the value.
+
+\paragraph{4. Backpropagation.}
+Propagate the final reward back up the path, updating visit counts and empirical means.
+
+\subsection*{Theoretical Guarantees}
+\paragraph{Consistency.}
+As the number of simulations grows:
+\[
+		\hat{\mu}_{i,t} \to \mu_i \quad \text{for each leaf } i,
+\]
+and UCT eventually selects the optimal path with probability $1$.
+
+\paragraph{Finite-Time Performance.}
+Analysis is subtle because:
+\begin{itemize}
+		\item leaf nodes behave like stationary bandits,
+		\item internal nodes behave like \emph{non-stationary} bandits (their estimates drift
+				as deeper nodes become better understood),
+		\item UCB analysis can be adapted to mild drift conditions.
+\end{itemize}
+A regret bound of order $O(K \log T)$ can be obtained, but additive constants may be
+\emph{doubly exponential} in tree depth $D$.
+Thus finite-time performance may be extremely poor in worst-case trees.
+
+\subsection*{Practical Behavior}
+In some adversarial tree structures, UCT may spend exponentially many simulations
+on suboptimal branches before discovering the optimal one.
+This is because UCB pulls suboptimal arms only $O(\log n)$ times, delaying discovery
+when high-reward leaves are deep and rare.
+
+\subsection*{Modern Extensions}
+\paragraph{AlphaZero.}
+Combines UCT with:
+\begin{itemize}
+		\item a value network $V(s)$,
+		\item a policy network $\pi(s,a)$,
+		\item mixed scores that combine UCT bonus, neural value predictions, and policy priors,
+		\item bootstrapping or full Monte-Carlo rollouts.
+\end{itemize}
+
+\paragraph{MuZero.}
+Learns its own dynamics model to simulate rollouts in a latent space and uses value
+bounds to stabilize planning.
+
+\paragraph{General Theme.}
+MCTS scales to large state spaces by coupling:
+\begin{itemize}
+		\item bandit-style exploration,
+		\item function approximation (values, policies, or dynamics),
+		\item selective lookahead search.
+\end{itemize}
+It remains the foundation for state-of-the-art reasoning and planning systems.
+\end{document}
