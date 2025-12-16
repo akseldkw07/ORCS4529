@@ -147,13 +147,11 @@ the agent included:
 
 \paragraph{Action Space} The actions available to the agent at each time step included
 \begin{itemize}
-		\item \textbf{Prices:} For each pending request, the price to offer the customer
+		\item \textbf{Pricing:} For each pending request, the price to offer the customer
 		\item \textbf{Repositioning:} For each vehicle, the desired (x, y) location to move towards
-		\item \textbf{Dispatch Decisions:} For each request, a one-hot encoded vector indicating which vehicle to
-				dispatch (or none)
+		\item \textbf{Dispatching:} For each request, a one-hot encoded vector indicating which vehicle to dispatch (or none)
 \end{itemize}
-\paragraph{Transition Model} The environment's transition dynamics were modeled to reflect realistic
-interactions:
+\paragraph{Transition Model} The environment's transition dynamics were modeled to reflect realistic interactions:
 \begin{itemize}
 		\item \textbf{Action Application:}
 				\begin{enumerate}
@@ -256,13 +254,13 @@ weren't able to achieve measurable improvements over our heuristic agent baselin
 
 \subsection{Policy Gradient vs. Baseline}
 \paragraph{20-node Baseline Comparison}
-As a baseline, we used a \textbf{NEAREST} car assignment heuristic, where the closest available car is
+As a baseline, we used a \textbf{nearest} car assignment heuristic, where the closest available car is
 dispatched to a request. If no demand exists, spare cars move randomly.
 
 We observed that the Policy Gradient approach, which proactively relocates cars and intelligently passes on
 suboptimal immediate demand for greater long-term rewards, significantly outperformed the baseline.
 \begin{itemize}
-		\item \textbf{NEAREST Baseline Profit:} 7,990.71 units
+		\item \textbf{Nearest Baseline Profit:} 7,990.71 units
 		\item \textbf{Policy Gradient Profit:} 12,829.93 units
 		\item \textbf{Improvement:} $\approx 60\%$
 \end{itemize}
@@ -285,7 +283,6 @@ For the Manhattan environment, we defined the heuristic agents as follows:
 				in the graph.
 \end{itemize}
 
-\textbf{TODO - explanation? Figures? debugging? next steps?}
 \subsection{Policy Gradient vs. PPO (Clipped)}
 We further compared vanilla Vanilla Policy Gradient (VPG) against PPO with clipped updates on the 20-node
 grid with circular demand movement.
@@ -295,7 +292,7 @@ aggressive policy updates, it ultimately achieves higher cumulative rewards and 
 stability is crucial for complex environments where VPG might collapse into suboptimal deterministic
 policies. Our observations align with theoretical findings in \cite{wang2025improving}, which suggest similar
 long-term performance between clipped PPO and repeated VPG, though PPO offers safety guarantees essential for
-physical deployment.
+physical deployment. We propose next steps to improve performance in the final section.
 
 \begin{figure}[H]
 		\centering
@@ -324,6 +321,42 @@ A demo video is available at \nolinkurl{https://youtu.be/IXpzuxEX3mU}.
 
 \section{Future Work}
 
+\paragraph{Next Steps}
+
+\begin{itemize}
+		\item \textbf{Observation Space Improvements:} There are a handful of redundant, shared, or noisy variables
+				in the observation space that could be removed or refined to improve learning efficiency. For example,
+				active rides duplicate information from pending requests. In addition, the (x, y) coordinates could be
+				replaced with learned embeddings or graph-based representations to better capture spatial relationships.
+		\item \textbf{Neural Network Improvements:} There are many areas of exploration in the neural network
+				architecture. These include improved hierarchical modeling of each sub-agent, improved priors to
+				encourage desired behavior, and learned embeddings of categorical variables. The advantages to a
+				hierarchical agent approach include (1) individul sub-agent pre-training (2) reduced observation space
+				per sub-agent, discarding irrelevant information, and (3)compatibility and enrichment with heuristic agents.
+
+				There are many parallel decisions being taken by the agent at each time step that could be better
+				modeled in a sequential manner, or at least whose outputs' score are conditional on the other output. For
+				example, the score awarded to the reposition decision of vehicle B is conditional on the reposition
+				decision of vehicle A. A reasonable prior on the desired distribution of repositioned vehicles could be a
+				uniform distribution across the graph, scaled by the (learned) "importance" of each node. Instead of
+				calculating repositioning actions sequentially, the repositioning sub-agent could be encouraged to
+				reposition vehicles uniformly over the graph. An entropic regularization term (amongst others) could
+				achieve this sub-goal.
+
+				Finaly, categorical variables (e.g., weather state) could be represented as learned embeddings instead of
+				one-hot encodings, allowing the model to learn relationships between categories.
+		\item \textbf{Reward Improvements:} The reward structure, conditioned on the buckets outlined above, could
+				benefiting from rebalancing. For example, the reward structure for dispatching actions is strictly
+				negative, ostensibly encouraing the agent to avoid dispatching entirely.
+		\item \textbf{Action Space Improvements:} From observing the reward logs, and the Neural Network outputs,
+				it's become apparent that the dispatching action space is complicated. Mapping requests to vehicles
+				directly creates a combinatorial explosion in the action space, making learning difficult (and is another
+				case of a poor system encouraging sequential decision-making). An alternative approach could be to have
+				the agent output a score for each vehicle-request pair, and then use a matching algorithm (e.g.,
+				Hungarian algorithm) to assign vehicles to requests based on these scores.
+\end{itemize}
+
+\paragraph{Stretch Goals}
 \begin{itemize}
 		\item \textbf{Neural Network Improvements:} Simplification of the observation space, partitioning the agent
 				into specialized sub-agents (pricing, dispatching, repositioning), bootstrapping from pre-trained models
