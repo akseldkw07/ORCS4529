@@ -6,6 +6,7 @@
 \usepackage{geometry} % For margin settings
 \usepackage{hyperref} % For clickable links
 \usepackage[backend=biber, style=authoryear]{biblatex}
+\usepackage{float}
 
 \geometry{margin=1in}
 \addbibresource{references.bib}
@@ -50,20 +51,20 @@ candidate for reinforcement learning and agentic approaches.
 
 \section{Methodology}
 
-\subsection{RL Formulation}
-We simulate a fleet of self-driving cars as a Markov Decision Process (MDP) to develop algorithms that
-optimize operations and profitability.
-\begin{itemize}
-		\item \textbf{State Space:} The state includes the location of each car, the distribution of passenger
-				demand, and current weather conditions. We include weather as it has been shown that meteorological
-				factors significantly drive the location and volume of demand, accounting for substantial variance in
-				ride-hailing profits.
-		\item \textbf{Action Space:} The action space consists of directing each car to move in one of the cardinal
-				directions (North, South, East, West) or stay put.
-\end{itemize}
+% \subsection{RL Formulation}
+% We simulate a fleet of self-driving cars as a Markov Decision Process (MDP) to develop algorithms that
+% optimize operations and profitability.
+% \begin{itemize}
+% 		\item \textbf{State Space:} The state includes the location of each car, the distribution of passenger
+% 				demand, and current weather conditions. We include weather as it has been shown that meteorological
+% 				factors significantly drive the location and volume of demand, accounting for substantial variance in
+% 				ride-hailing profits.
+% 		\item \textbf{Action Space:} The action space consists of directing each car to move in one of the cardinal
+% 				directions (North, South, East, West) or stay put.
+% \end{itemize}
 
-While the problem could be approached by having each car make location decisions independently, implicit
-coordination often makes such solutions unstable. Therefore, we utilize a centralized policy approach.
+% While the problem could be approached by having each car make location decisions independently, implicit
+% coordination often makes such solutions unstable. Therefore, we utilize a centralized policy approach.
 
 \subsection{Environment and Simulation}
 \label{sec:env}
@@ -75,13 +76,128 @@ state-action space scales linearly with grid size—we initially evaluated basic
 \times 5$ graph before scaling to larger simulations.
 
 \paragraph{Gymnasium Framework}
-We built our simulation environment using the OpenAI Gymnasium scaffolding. Leveraging Gymnasium abstracted
+We built our simulation environment using the OpenAI Gymnasium scaffolding. Gymnasium abstracts away
 many implementation details, allowing us to focus on defining the state space, action space, transition
 model, and reward structures as follows.
 
-\paragraph{State Space} The state space was deliberately abstracted away from the graph it repre
+\paragraph{OSMnx Integration} For the Manhattan simulation, we utilized OSMnx to extract a realistic road network
+graph from OpenStreetMap data. This allowed us to model the city's irregular layout and road connectivity
+accurately, providing a more challenging and realistic environment for our RL agent.
 
-% \paragraph{Observation Space and Node Modeling}
+\paragraph{State Space} The state space was deliberately abstracted away from the underlying graph. This
+decision was made to facilitate generalization to unseen cities with different layouts. The state provided to
+the agent included:
+% \begin{itemize}
+% 		\item \textbf{Globals (Vector)} Time of day (normalized to the unit circle), Day of week (normalized to
+% the unit circle), Weather state (categorical variable representing weather conditions).
+% 		\item \textbf{Supply-Demand Conditions (Vector)} The current ratio of available cars to ride requests
+% awaiting dispatch (requests that had accepted the price provided to them from the model in the step prior)
+% \end{itemize}
+
+\begin{itemize}
+		\item \textbf{Globals (Vector)} These global context variables provide the model with temporal and
+				environmental information, allowing it to learn the latent patterns in demand fluctuations
+				\begin{enumerate}
+						\item Time of day (normalized to the unit circle)
+						\item Day of week (normalized to the unit circle)
+						\item Weather state (categorical variable representing weather conditions)
+				\end{enumerate}
+		\item \textbf{Supply-Demand Conditions (Vector)} These variables inform the agent about the current state
+				of supply and demand in the environment
+				\begin{enumerate}
+						\item The current ratio of available cars to ride requests awaiting dispatch (requests that had
+								accepted the price provided to them from the model in the step prior)
+						\item Vehicles per nodes
+						\item Mean lambda value per node (sampled each step from a Poisson distribution with parameter $\lambda$)
+				\end{enumerate}
+		\item \textbf{Vehicles (Matrix)} A matrix representation of the vehicles in the environment
+				\begin{enumerate}
+						\item Location (X coordinate) - Normalized to [-1, 1]
+						\item Location (Y coordinate) - Normalized to [-1, 1]
+						\item Battery level - Normalized to [0, 1]
+						\item Status: {Idle, Assigned, In-Transit, Charging} - One-hot encoded
+				\end{enumerate}
+		\item \textbf{Pending Requests (Matrix)} A matrix representation of the pending requests in the environment
+				\begin{enumerate}
+						\item Pickup Location (X coordinate) - Normalized to [-1, 1]
+						\item Pickup Location (Y coordinate) - Normalized to [-1, 1]
+						\item Drop-off Location (X coordinate) - Normalized to [-1, 1]
+						\item Drop-off Location (Y coordinate) - Normalized to [-1, 1]
+						\item Cust bias (coefficient representing customers' base willingness to pay)
+						\item Cust temperature (coefficient representing customers' sensitivity to price changes)
+						\item Estimated Cost (linear product of distance and a per-unit distance cost)
+						\item Max Wait Time (in time steps) - Maximum time a customer is willing to wait for pickup once
+								they've accepted the price
+						\item Wait Time (in time steps) - Current time the customer has been waiting for pickup
+						\item Status: {Expired, Price Rejected, Awaiting Price, Accepted Price (awaiting pickup), Assigned
+								(vehicle en route), In-Transit} - One-hot encoded
+				\end{enumerate}
+		\item \textbf{Active Rides (Matrix)}
+				\begin{enumerate}
+						\item Pickups \& Drop off location, Estimated Cost - (duplicated from matched request)
+						\item Price - Price agreed
+						\item Total Distance - Total distance of the ride
+						\item Distance Traveled - Distance traveled so far
+				\end{enumerate}
+		\item \textbf{Dispatch Mask (Vector)} A binary vector indicating which vehicles are eligible for
+				dispatching to new requests (1 if eligible, 0 otherwise)
+		\item \textbf{Pricing Mask (Vector)} A binary vector indicating which requests are eligible for pricing (1
+				if eligible, 0 otherwise)
+\end{itemize}
+
+\paragraph{Action Space} The actions available to the agent at each time step included
+\begin{itemize}
+		\item \textbf{Prices:} For each pending request, the price to offer the customer
+		\item \textbf{Repositioning:} For each vehicle, the desired (x, y) location to move towards
+		\item \textbf{Dispatch Decisions:} For each request, a one-hot encoded vector indicating which vehicle to
+				dispatch (or none)
+\end{itemize}
+\paragraph{Transition Model} The environment's transition dynamics were modeled to reflect realistic
+interactions:
+\begin{itemize}
+		\item \textbf{Action Application:}
+				\begin{enumerate}
+						\item \textbf{Pricing Action:} Calculate the z-score of the probability of acceptance based on price,
+								supply demand imbalance, weather, estimated cost, cusomter bias \& temperature.
+						\item \textbf{Reposition Action:} Move \textbf{idle} vehicles towards their target locations.
+						\item \textbf{Dispatch Action:} Assign vehicles to requests based on the dispatch decisions made by the agent.
+				\end{enumerate}
+		\item \textbf{State Management:}
+				\begin{enumerate}
+						\item \textbf{Spawn New Requests:} New ride requests were generated based on a Poisson process. Each
+								node in the graph has an associated $\lambda$ parameter, dictating the average rate of request
+								arrivals. This parameter could vary over time to simulate demand fluctuations.
+						\item \textbf{Update Existing Requests:} The wait time for each pending request was incremented;
+								requests that exceeded their maximum wait time were marked as expired and removed from the pending list.
+						\item \textbf{Update Rides:} Move active rides towards drop-off locations (deterministic, Djikstra);
+								complete rides when the destination is reached, freeing up vehicles. Match vehicles to requests upon dispatch.
+								% \item \textbf{Update Vehicle Status:} Update the status of each vehicle based on its current
+								% activity (e.g., idle, assigned, in-transit, charging).
+						\item \textbf{Global Variables}: Update time of day, day of week, and weather conditions as per the
+								simulation clock.
+				\end{enumerate}
+\end{itemize}
+
+\paragraph{Reward Structure} The reward system was designed to allow finetuning, and eventual sparsification of rewards:
+\begin{itemize}
+		\item \textbf{Dispatches}:
+				\begin{itemize}
+						\item Penalties: Multiple dispatches to the same vehicle, dispatching an unavailable vehicle, distance
+								from vehicle to pickup location (euclidean distance for simplification)
+						\item Rewards: None (implicit reward through successful pickups)
+				\end{itemize}
+		\item \textbf{Requests}:
+				\begin{itemize}
+						\item Penalties: Expired requests, rejected prices
+						\item Rewards: None (implicit reward through successful pickups)
+				\end{itemize}
+		\item \textbf{Rides}:
+				\begin{itemize}
+						\item Penalties: cost per km traveled (fuel, time)
+						\item Rewards: fare collected per meter traveled, extra reward upon completion
+				\end{itemize}
+\end{itemize}
+% \paragraph{Observation Space and Node Modeling}–
 % A key contribution of our environment design is the specific modeling of the city graph provided to the PPO agent:
 % \begin{itemize}
 %     \item \textbf{Node Representation:} The city is modeled as a set of connected nodes. Crucially, the
@@ -120,26 +236,26 @@ Our policy model is a 2-layer neural network with a hidden size of 128 and ReLU 
 Adam. The critic (Value Function) shares this architecture but outputs a single value (advantage), optimized
 via mean squared error.
 
-\subsection{Reward Function}
-Our objective is to maximize the number of matched requests (served demand). The reward function incentivizes
-three behaviors:
-\begin{enumerate}
-		\item Minimizing unnecessary movement (fuel/time costs).
-		\item Relocating free cars to forecasted high-demand areas (pre-positioning).
-		\item Successfully picking up nearby customers.
-\end{enumerate}
-
 \section{Results}
 
-We compared different policies on a 20-node city grid. To test robustness, we simulated a high-demand center
-(controlled by parameter $\lambda$) moving in a circular trajectory around the city, the position of which
-was predictable via the weather state provided to the agent. This assumption is realistic, as autonomous
-fleets (e.g., Waymo) have access to real-time weather and event forecasting.
+We compared different policies on a 20-node city grid before scaling up to Manhattan (graph sparsified to 782
+nodes, from 4k+).
+\paragraph{20-node results}
+To test robustness, we simulated a high-demand center (controlled by parameter $\lambda$) moving in a
+circular trajectory around the city, the position of which was predictable via the weather state provided to
+the agent. This assumption is realistic, as autonomous fleets (e.g., Waymo) have access to real-time weather
+and event forecasting.
 
 Evaluations were conducted over 20-minute episodes, reflecting the average ride time and the threshold at
 which customers typically cancel if a vehicle has not arrived.
 
+\paragraph{Manhattan results}
+After validating our approach on the 20-node grid, we scaled our environment to a realistic Manhattan layout.
+The complexity of the environment increased significantly, as did the action and observation space. We
+weren't able to achieve measurable improvements over our heuristic agent baselines.
+
 \subsection{Policy Gradient vs. Baseline}
+\paragraph{20-node Baseline Comparison}
 As a baseline, we used a \textbf{NEAREST} car assignment heuristic, where the closest available car is
 dispatched to a request. If no demand exists, spare cars move randomly.
 
@@ -158,6 +274,18 @@ suboptimal immediate demand for greater long-term rewards, significantly outperf
 		\label{fig:profit}
 \end{figure}
 
+\paragraph{Manhattan Baseline Comparison}
+For the Manhattan environment, we defined the heuristic agents as follows:
+\begin{itemize}
+		\item \textbf{Pricing Agent:} $\text{Price} = (2 \cdot \text{Estimated Cost}) - \text{Supply/Demand
+				Imbalance}$ (Normalized to [0, 1], higher value indicates oversupply)
+		\item \textbf{Dispatch Agent:} Iterate through requests, calculate closest vehicle, dispatch if within
+				threshold distance; otherwise skip.
+		\item \textbf{Repositioning Agent:} Assign vehicles to nodes proportionally to the node's degree centrality
+				in the graph.
+\end{itemize}
+
+\textbf{TODO - explanation? Figures? debugging? next steps?}
 \subsection{Policy Gradient vs. PPO (Clipped)}
 We further compared vanilla Vanilla Policy Gradient (VPG) against PPO with clipped updates on the 20-node
 grid with circular demand movement.
@@ -169,30 +297,45 @@ policies. Our observations align with theoretical findings in \cite{wang2025impr
 long-term performance between clipped PPO and repeated VPG, though PPO offers safety guarantees essential for
 physical deployment.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 		\centering
 		\includegraphics[width=\linewidth]{images/gradinet-vs-ppo.png}
 		\caption{Training curves: Gradient policy update vs. PPO with clipping.}
 		\label{fig:ppo_comparison}
 \end{figure}
 
-\begin{figure}[h!]
+\begin{figure}[H]
 		\centering
 		\includegraphics[width=\linewidth]{images/nodes.png}
 		\caption{Visualization of trained behavior: Cars aggregating near high-value Red/Orange nodes.}
 		\label{fig:nodes}
 \end{figure}
 
+\space
 \section{Conclusion}
 
 In this project, we successfully formulated the autonomous fleet management problem as an MDP and solved it
-using PPO. By explicitly modeling the city as a graph of nodes containing vehicle count data and highlighting
-high-reward zones (Red/Orange nodes), our agent learned to anticipate demand rather than merely reacting to it.
+using PPO. By explicitly modeling our city as a simplified graph of nodes containing vehicle count data and
+highlighting high-reward zones (Red/Orange nodes), our agent learned to anticipate demand rather than merely
+reacting to it. However, our approach struggled to scale to a larger, more complicated environment.
 
 The code is available at \nolinkurl{https://github.com/akseldkw07/Waymo-Agent.git}. \\
 A demo video is available at \nolinkurl{https://youtu.be/IXpzuxEX3mU}.
 
 \section{Future Work}
+
+\begin{itemize}
+		\item \textbf{Neural Network Improvements:} Simplification of the observation space, partitioning the agent
+				into specialized sub-agents (pricing, dispatching, repositioning), bootstrapping from pre-trained models
+				or heuristic agent action, observation, and reward data.
+		\item \textbf{Reward Sparsification:} Gradually reducing the frequency of intermediate rewards to encourage
+				long-term planning.
+		\item \textbf{Generalizability:} Transfering learned policies to unseen cities with different layouts and
+				demand patterns.
+		\item \textbf{Graph Neural Networks:} Utilizing GNNs to better capture the relational structure of the city
+				graph, and remove the intermediate (x, y) coordinate representations.
+\end{itemize}
+
 Our solution could be extended to other cities with irregular layouts. This would require reinterpreting the
 graph structure, as the Manhattan distance heuristic applies primarily to grid-like cities. Future work would
 involve integrating OpenStreetMap data (OSMnx) to calculate realistic travel times on non-grid road networks.
